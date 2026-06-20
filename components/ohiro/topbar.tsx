@@ -5,6 +5,8 @@ import { Plus, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskBadge } from "./risk-badge";
 import { RiskLevel } from "@/lib/types";
+import { NotificationBell } from "./notification-bell";
+import type { Notification } from "@/lib/notification-actions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +31,7 @@ interface TopbarProps {
   userEmail?: string;
   onSignOut?: () => void;
   isPending?: boolean;
+  notifications?: Notification[];
   className?: string;
 }
 
@@ -40,6 +43,7 @@ const viewLabels: Record<string, string> = {
   dividas: "GESTÃO DE DÍVIDAS",
   investimentos: "CARTEIRA DE INVESTIMENTOS",
   projecoes: "SIMULADOR DE CENÁRIOS",
+  ia: "IA FINANCEIRA",
   configuracoes: "CONFIGURAÇÕES",
 };
 
@@ -54,6 +58,7 @@ export function Topbar({
   userEmail,
   onSignOut,
   isPending,
+  notifications = [],
   className,
 }: TopbarProps) {
   const viewLabel = viewLabels[activeView] ?? activeView.toUpperCase();
@@ -100,9 +105,10 @@ export function Topbar({
         </button>
       </div>
 
-      {/* Right: risk + add button + user */}
+      {/* Right: risk + notifications + add button + user */}
       <div className="flex items-center gap-3">
         <RiskBadge level={riskLevel} size="sm" />
+        <NotificationBell notifications={notifications} />
         <Button
           size="sm"
           onClick={onAddTransaction}

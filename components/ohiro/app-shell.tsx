@@ -14,6 +14,7 @@ import { DebtsView } from "./views/debts-view";
 import { InvestmentsView } from "./views/investments-view";
 import { ProjectionsView } from "./views/projections-view";
 import { SettingsView } from "./views/settings-view";
+import { AIView } from "./views/ai-view";
 import {
   addTransaction,
   updateTransaction,
@@ -26,6 +27,7 @@ import {
   deleteDebt,
   signOut,
 } from "@/lib/actions";
+import type { Notification } from "@/lib/notification-actions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -34,6 +36,8 @@ interface AppShellProps {
   initialTransactions: Transaction[];
   initialInvestments: Investment[];
   initialDebts: Debt[];
+  initialNotifications: Notification[];
+  initialNotificationDays: number;
 }
 
 export function AppShell({
@@ -41,6 +45,8 @@ export function AppShell({
   initialTransactions,
   initialInvestments,
   initialDebts,
+  initialNotifications,
+  initialNotificationDays,
 }: AppShellProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -207,6 +213,7 @@ export function AppShell({
           userEmail={userEmail}
           onSignOut={handleSignOut}
           isPending={isPending}
+          notifications={initialNotifications}
         />
 
         <main className="flex-1 overflow-auto">
@@ -248,8 +255,18 @@ export function AppShell({
           {activeView === "projecoes" && (
             <ProjectionsView transactions={transactions} investments={investments} />
           )}
+          {activeView === "ia" && (
+            <AIView
+              transactions={transactions}
+              investments={investments}
+              debts={debts}
+            />
+          )}
           {activeView === "configuracoes" && (
-            <SettingsView onResetData={handleResetData} />
+            <SettingsView
+              onResetData={handleResetData}
+              initialNotificationDays={initialNotificationDays}
+            />
           )}
         </main>
       </div>

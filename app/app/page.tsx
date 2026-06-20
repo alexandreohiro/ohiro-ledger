@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getTransactions, getInvestments, getDebts } from '@/lib/actions'
+import {
+  getNotifications,
+  getUserSettings,
+  syncDebtNotifications,
+} from '@/lib/notification-actions'
 import { AppShell } from '@/components/ohiro/app-shell'
 
 export default async function AppPage() {
@@ -13,10 +18,15 @@ export default async function AppPage() {
     redirect('/auth/login')
   }
 
-  const [transactions, investments, debts] = await Promise.all([
+  // Sincroniza alertas de dívidas (idempotente — não duplica notificações)
+  await syncDebtNotifications()
+
+  const [transactions, investments, debts, notifications, settings] = await Promise.all([
     getTransactions(),
     getInvestments(),
     getDebts(),
+    getNotifications(),
+    getUserSettings(),
   ])
 
   return (
@@ -25,6 +35,8 @@ export default async function AppPage() {
       initialTransactions={transactions}
       initialInvestments={investments}
       initialDebts={debts}
+      initialNotifications={notifications}
+      initialNotificationDays={settings.notificationDaysBefore}
     />
   )
 }

@@ -14,6 +14,7 @@ import {
   Shield,
   Menu,
   X,
+  BrainCircuit,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -25,6 +26,7 @@ const navItems: { id: ActiveView; label: string; icon: React.ElementType; shortL
   { id: "dividas", label: "Dívidas", shortLabel: "DVDA", icon: CreditCard },
   { id: "investimentos", label: "Investimentos", shortLabel: "INVS", icon: LineChart },
   { id: "projecoes", label: "Projeções", shortLabel: "PROJ", icon: BarChart3 },
+  { id: "ia", label: "IA Financeira", shortLabel: "IA", icon: BrainCircuit },
   { id: "configuracoes", label: "Configurações", shortLabel: "CONF", icon: Settings },
 ];
 
@@ -100,9 +102,10 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150 w-full text-left group",
                   collapsed && "justify-center px-0",
-                  isActive
-                    ? "bg-[hsl(var(--accent))/15] text-[hsl(var(--accent))] border border-[hsl(var(--accent))/25]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30 border border-transparent"
+                  item.id === "ia" && !isActive && "text-primary/70 hover:text-primary hover:bg-primary/10 border border-transparent",
+                  item.id === "ia" && isActive && "bg-primary/15 text-primary border border-primary/30",
+                  item.id !== "ia" && isActive && "bg-[hsl(var(--accent))/15] text-[hsl(var(--accent))] border border-[hsl(var(--accent))/25]",
+                  item.id !== "ia" && !isActive && "text-muted-foreground hover:text-foreground hover:bg-muted/30 border border-transparent"
                 )}
               >
                 <Icon className="size-4 shrink-0" />
