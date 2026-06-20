@@ -186,7 +186,7 @@ export function ProjectionsView({ transactions, investments }: ProjectionsViewPr
             <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: "monospace", fill: "hsl(var(--muted-foreground))" }} />
             <YAxis tick={{ fontSize: 10, fontFamily: "monospace", fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `R$${(v / 1000).toFixed(1)}k`} />
             <Tooltip
-              formatter={(v: number) => [formatCurrency(v), "Patrimônio"]}
+              formatter={(v) => [formatCurrency(Number(v)), "Patrimônio"]}
               contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontFamily: "monospace", fontSize: 11 }}
             />
             <Bar dataKey="patrimony" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />

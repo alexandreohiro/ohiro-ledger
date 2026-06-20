@@ -242,7 +242,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={2} dataKey="value">
                   {pieData.map((entry, i) => <Cell key={i} fill={entry.color} stroke="transparent" />)}
                 </Pie>
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-col gap-1.5 mt-2">

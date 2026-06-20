@@ -130,7 +130,7 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
         </div>
         <div className="flex gap-2">
           <Filter className="size-4 text-muted-foreground self-center" />
-          <Select value={filterType} onValueChange={setFilterType}>
+          <Select value={filterType} onValueChange={(v) => setFilterType(v ?? "all")}>
             <SelectTrigger className="h-8 w-[130px] text-xs font-mono">
               <SelectValue />
             </SelectTrigger>
@@ -141,7 +141,7 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
               ))}
             </SelectContent>
           </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v ?? "all")}>
             <SelectTrigger className="h-8 w-[130px] text-xs font-mono">
               <SelectValue />
             </SelectTrigger>

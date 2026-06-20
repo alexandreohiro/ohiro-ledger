@@ -45,11 +45,14 @@ export function AppShell() {
     }
   }
 
-  function handleResetData(t: Transaction[], i: Investment[], d: Debt[]) {
-    // Reset by re-writing each array
-    t.forEach((tx) => store.addTransaction(tx));
-    i.forEach((inv) => store.addInvestment(inv));
-    d.forEach((debt) => store.addDebt(debt));
+  function handleResetData(_t: Transaction[], _i: Investment[], _d: Debt[]) {
+    // Reload the page to restore mock data from localStorage defaults
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("ohiro_transactions");
+      localStorage.removeItem("ohiro_investments");
+      localStorage.removeItem("ohiro_debts");
+      window.location.reload();
+    }
   }
 
   return (
