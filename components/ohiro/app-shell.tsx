@@ -27,6 +27,7 @@ import {
   deleteDebt,
   signOut,
 } from "@/lib/actions";
+import type { Notification } from "@/lib/notification-actions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -35,6 +36,8 @@ interface AppShellProps {
   initialTransactions: Transaction[];
   initialInvestments: Investment[];
   initialDebts: Debt[];
+  initialNotifications: Notification[];
+  initialNotificationDays: number;
 }
 
 export function AppShell({
@@ -42,6 +45,8 @@ export function AppShell({
   initialTransactions,
   initialInvestments,
   initialDebts,
+  initialNotifications,
+  initialNotificationDays,
 }: AppShellProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -208,6 +213,7 @@ export function AppShell({
           userEmail={userEmail}
           onSignOut={handleSignOut}
           isPending={isPending}
+          notifications={initialNotifications}
         />
 
         <main className="flex-1 overflow-auto">
@@ -257,7 +263,10 @@ export function AppShell({
             />
           )}
           {activeView === "configuracoes" && (
-            <SettingsView onResetData={handleResetData} />
+            <SettingsView
+              onResetData={handleResetData}
+              initialNotificationDays={initialNotificationDays}
+            />
           )}
         </main>
       </div>
