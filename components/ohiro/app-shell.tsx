@@ -14,6 +14,7 @@ import { DebtsView } from "./views/debts-view";
 import { InvestmentsView } from "./views/investments-view";
 import { ProjectionsView } from "./views/projections-view";
 import { SettingsView } from "./views/settings-view";
+import { AIView } from "./views/ai-view";
 import {
   addTransaction,
   updateTransaction,
@@ -247,6 +248,13 @@ export function AppShell({
           )}
           {activeView === "projecoes" && (
             <ProjectionsView transactions={transactions} investments={investments} />
+          )}
+          {activeView === "ia" && (
+            <AIView
+              transactions={transactions}
+              investments={investments}
+              debts={debts}
+            />
           )}
           {activeView === "configuracoes" && (
             <SettingsView onResetData={handleResetData} />
