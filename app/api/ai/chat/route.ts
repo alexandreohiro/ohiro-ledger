@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
+import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -172,7 +172,7 @@ export async function POST(req: Request) {
 
   // ── Parse seguro do body ──────────────────────────────────────────────────────
   let body: {
-    messages?: unknown[];
+    messages?: UIMessage[];
     context?: string;
     files?: Array<{ name: string; type: string; data: string }>;
   };
@@ -208,38 +208,30 @@ export async function POST(req: Request) {
     }
   }
 
-  // ── Monta mensagens para o modelo ─────────────────────────────────────────────
-  const rawMessages = messages as Array<{ role: string; parts?: unknown[]; content?: string }>;
+  // ── Converte UIMessage[] → ModelMessage[] via SDK (correto para AI SDK 6) ────
+  const uiMessages = (messages ?? []) as UIMessage[];
+  const modelMessages = await convertToModelMessages(uiMessages);
 
-  // Converte do formato UIMessage (parts) para ModelMessage (content)
-  const modelMessages: ModelMessage[] = rawMessages.map((m) => {
-    const textContent =
-      typeof m.content === "string"
-        ? sanitizeMessage(m.content, 8000)
-        : Array.isArray(m.parts)
-        ? sanitizeMessage(
-            (m.parts as Array<{ type: string; text?: string }>)
-              .filter((p) => p.type === "text")
-              .map((p) => p.text ?? "")
-              .join(""),
-            8000
-          )
-        : "";
-    return { role: m.role as "user" | "assistant", content: textContent };
-  });
-
-  // Injeta arquivos na última mensagem do usuário como partes multimodais
+  // Se há arquivos, substitui a última mensagem do usuário adicionando fileParts
   if (files.length > 0 && modelMessages.length > 0) {
     const lastIdx = modelMessages.length - 1;
     const last = modelMessages[lastIdx];
     if (last.role === "user") {
-      const textPart = { type: "text" as const, text: typeof last.content === "string" ? last.content : "" };
+      const textContent = typeof last.content === "string" ? last.content : "";
+      const textParts = typeof last.content === "string"
+        ? [{ type: "text" as const, text: last.content }]
+        : Array.isArray(last.content) ? last.content : [];
       const fileParts = files.map((f) => ({
         type: "file" as const,
         mediaType: f.type as `${string}/${string}`,
         data: f.data,
       }));
-      modelMessages[lastIdx] = { role: "user", content: [textPart, ...fileParts] };
+      modelMessages[lastIdx] = {
+        role: "user",
+        content: textContent
+          ? [...textParts, ...fileParts]
+          : fileParts,
+      };
     }
   }
 
