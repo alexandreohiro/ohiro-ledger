@@ -144,6 +144,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
   const financialContext = buildFinancialContext(transactions, investments, debts);
 
+  const [apiError, setApiError] = useState<string | null>(null);
+
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/chat",
@@ -160,6 +162,16 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         },
       }),
     }),
+    onError: (err) => {
+      const msg = err?.message ?? String(err);
+      if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+        setApiError("Limite de requisições atingido. Aguarde alguns instantes e tente novamente.");
+      } else if (msg.includes("401") || msg.toLowerCase().includes("autenticad")) {
+        setApiError("Sessão expirada. Recarregue a página.");
+      } else {
+        setApiError("Falha na comunicação com a IA. Verifique sua conexão e tente novamente.");
+      }
+    },
   });
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -270,6 +282,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     setInputValue("");
     setAttachedFiles([]);
     setFileError(null);
+    setApiError(null);
     setNeedsRefresh(false);
   }
 
@@ -415,6 +428,21 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               </div>
             );
           })
+        )}
+
+        {/* API error banner */}
+        {apiError && (
+          <div className="flex items-start gap-3 max-w-3xl">
+            <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-destructive/10 border-destructive/25">
+              <AlertTriangle className="size-3.5 text-destructive" />
+            </div>
+            <div className="flex items-center justify-between gap-3 flex-1 rounded-xl px-4 py-3 bg-destructive/5 border border-destructive/20 text-xs font-mono text-destructive">
+              <span>{apiError}</span>
+              <button onClick={() => setApiError(null)} aria-label="Fechar erro" className="shrink-0 hover:opacity-70 transition-opacity">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Streaming dots */}
@@ -563,7 +591,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         </div>
 
         <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
-          Gemini 2.0 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
+          Vercel AI Gateway · Gemini 2.0 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
         </p>
       </div>
     </div>

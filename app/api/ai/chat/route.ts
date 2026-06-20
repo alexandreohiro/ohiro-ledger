@@ -1,4 +1,3 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -12,9 +11,8 @@ import {
 
 export const maxDuration = 60;
 
-const gemini = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-});
+// Usa Vercel AI Gateway — zero config, sem necessidade de chave própria
+const AI_MODEL = "google/gemini-2.0-flash";
 
 // ── Tools de mutação de dados (scoped por userId) ─────────────────────────────
 function buildTools(userId: string) {
@@ -269,19 +267,29 @@ COMPORTAMENTO:
   // ── Streaming ─────────────────────────────────────────────────────────────────
   try {
     const result = streamText({
-      model: gemini("gemini-2.0-flash"),
+      model: AI_MODEL,
       system: systemPrompt,
       messages: modelMessages,
       tools: buildTools(user.id),
       stopWhen: stepCountIs(12),
       temperature: 0.3,
+      onError: (err) => {
+        console.error("[ai/chat] stream error:", err);
+      },
     });
 
     return result.toUIMessageStreamResponse();
-  } catch (err) {
-    console.error("[v0] AI chat error:", err);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[ai/chat] fatal error:", msg);
+    if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+      return new Response(
+        JSON.stringify({ error: "Limite de requisições da API atingido. Tente novamente em alguns instantes." }),
+        { status: 429 }
+      );
+    }
     return new Response(
-      JSON.stringify({ error: "Erro ao processar. Tente novamente." }),
+      JSON.stringify({ error: `Erro ao processar: ${msg}` }),
       { status: 500 }
     );
   }
