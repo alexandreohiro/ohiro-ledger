@@ -1,10 +1,17 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskBadge } from "./risk-badge";
 import { RiskLevel } from "@/lib/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -19,6 +26,9 @@ interface TopbarProps {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onAddTransaction: () => void;
+  userEmail?: string;
+  onSignOut?: () => void;
+  isPending?: boolean;
   className?: string;
 }
 
@@ -41,6 +51,9 @@ export function Topbar({
   onPrevMonth,
   onNextMonth,
   onAddTransaction,
+  userEmail,
+  onSignOut,
+  isPending,
   className,
 }: TopbarProps) {
   const viewLabel = viewLabels[activeView] ?? activeView.toUpperCase();
@@ -87,17 +100,39 @@ export function Topbar({
         </button>
       </div>
 
-      {/* Right: risk + add button */}
+      {/* Right: risk + add button + user */}
       <div className="flex items-center gap-3">
         <RiskBadge level={riskLevel} size="sm" />
         <Button
           size="sm"
           onClick={onAddTransaction}
           className="h-8 text-xs font-mono font-medium"
+          disabled={isPending}
         >
           <Plus className="size-3.5" data-icon="inline-start" />
           <span className="hidden sm:inline">Lançamento</span>
         </Button>
+        {userEmail && onSignOut && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button className="flex size-8 items-center justify-center rounded-full bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors font-mono text-xs font-bold">
+                  {userEmail[0].toUpperCase()}
+                </button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-56 font-mono text-xs">
+              <div className="px-2 py-1.5 text-[11px] text-muted-foreground truncate">
+                {userEmail}
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive cursor-pointer">
+                <LogOut className="size-3.5 mr-2" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </header>
   );

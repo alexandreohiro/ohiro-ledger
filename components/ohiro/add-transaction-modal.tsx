@@ -58,7 +58,6 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const now = new Date().toISOString();
     const transaction: Transaction = {
       id: editTransaction?.id ?? generateId(),
       date: form.date ?? today,
@@ -73,8 +72,6 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
       status: form.status as TransactionStatus ?? "Previsto",
       dueDate: form.dueDate ?? today,
       recurrence: form.recurrence as RecurrenceType ?? "Nenhuma",
-      createdAt: editTransaction?.createdAt ?? now,
-      updatedAt: now,
     };
     onAdd(transaction);
     onClose();

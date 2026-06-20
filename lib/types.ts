@@ -29,10 +29,8 @@ export interface Transaction {
   currency: Currency;
   exchangeRate: number;
   status: TransactionStatus;
-  dueDate: string;
+  dueDate?: string;
   recurrence: RecurrenceType;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export type InvestmentClass =
@@ -63,7 +61,7 @@ export interface Debt {
   originalAmount: number;
   currentAmount: number;
   installmentAmount: number;
-  dueDate: string;
+  dueDate?: string;
   interestRate: number;
   status: DebtStatus;
   priority: DebtPriority;

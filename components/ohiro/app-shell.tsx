@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ActiveView, Transaction, Investment, Debt } from "@/lib/types";
-import { useFinancialStore } from "@/lib/store";
 import { calcFinancialSummary } from "@/lib/calculations";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -14,53 +14,188 @@ import { DebtsView } from "./views/debts-view";
 import { InvestmentsView } from "./views/investments-view";
 import { ProjectionsView } from "./views/projections-view";
 import { SettingsView } from "./views/settings-view";
-import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  addTransaction,
+  updateTransaction,
+  deleteTransaction,
+  addInvestment,
+  updateInvestment,
+  deleteInvestment,
+  addDebt,
+  updateDebt,
+  deleteDebt,
+  signOut,
+} from "@/lib/actions";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
-export function AppShell() {
+interface AppShellProps {
+  userEmail: string;
+  initialTransactions: Transaction[];
+  initialInvestments: Investment[];
+  initialDebts: Debt[];
+}
+
+export function AppShell({
+  userEmail,
+  initialTransactions,
+  initialInvestments,
+  initialDebts,
+}: AppShellProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [usdRate, setUsdRate] = useState(5.05);
 
-  const store = useFinancialStore();
+  // Otimistic local state — revalidado pelo servidor via revalidatePath
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [investments, setInvestments] = useState<Investment[]>(initialInvestments);
+  const [debts, setDebts] = useState<Debt[]>(initialDebts);
 
-  const summary = calcFinancialSummary(store.transactions, store.investments);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const summary = calcFinancialSummary(transactions, investments);
 
   function handlePrevMonth() {
-    if (currentMonth === 0) {
-      setCurrentMonth(11);
-      setCurrentYear((y) => y - 1);
-    } else {
-      setCurrentMonth((m) => m - 1);
-    }
+    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear((y) => y - 1); }
+    else setCurrentMonth((m) => m - 1);
   }
-
   function handleNextMonth() {
-    if (currentMonth === 11) {
-      setCurrentMonth(0);
-      setCurrentYear((y) => y + 1);
-    } else {
-      setCurrentMonth((m) => m + 1);
+    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); }
+    else setCurrentMonth((m) => m + 1);
+  }
+
+  // ── Transactions ──────────────────────────────────────────────────────────
+  async function handleAddTransaction(tx: Omit<Transaction, "id">) {
+    const tempId = crypto.randomUUID();
+    const optimistic = { ...tx, id: tempId };
+    setTransactions((prev) => [optimistic, ...prev]);
+    try {
+      await addTransaction(tx);
+      startTransition(() => router.refresh());
+    } catch {
+      setTransactions((prev) => prev.filter((t) => t.id !== tempId));
+      toast.error("Erro ao adicionar lançamento");
     }
   }
 
-  function handleResetData(_t: Transaction[], _i: Investment[], _d: Debt[]) {
-    // Reload the page to restore mock data from localStorage defaults
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("ohiro_transactions");
-      localStorage.removeItem("ohiro_investments");
-      localStorage.removeItem("ohiro_debts");
-      window.location.reload();
+  async function handleUpdateTransaction(tx: Transaction) {
+    setTransactions((prev) => prev.map((t) => (t.id === tx.id ? tx : t)));
+    try {
+      await updateTransaction(tx);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao atualizar lançamento");
     }
+  }
+
+  async function handleDeleteTransaction(id: string) {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await deleteTransaction(id);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao excluir lançamento");
+    }
+  }
+
+  // ── Investments ───────────────────────────────────────────────────────────
+  async function handleAddInvestment(inv: Omit<Investment, "id">) {
+    const tempId = crypto.randomUUID();
+    setInvestments((prev) => [{ ...inv, id: tempId }, ...prev]);
+    try {
+      await addInvestment(inv);
+      startTransition(() => router.refresh());
+    } catch {
+      setInvestments((prev) => prev.filter((i) => i.id !== tempId));
+      toast.error("Erro ao adicionar investimento");
+    }
+  }
+
+  async function handleUpdateInvestment(inv: Investment) {
+    setInvestments((prev) => prev.map((i) => (i.id === inv.id ? inv : i)));
+    try {
+      await updateInvestment(inv);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao atualizar investimento");
+    }
+  }
+
+  async function handleDeleteInvestment(id: string) {
+    setInvestments((prev) => prev.filter((i) => i.id !== id));
+    try {
+      await deleteInvestment(id);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao excluir investimento");
+    }
+  }
+
+  // ── Debts ─────────────────────────────────────────────────────────────────
+  async function handleAddDebt(debt: Omit<Debt, "id">) {
+    const tempId = crypto.randomUUID();
+    setDebts((prev) => [{ ...debt, id: tempId }, ...prev]);
+    try {
+      await addDebt(debt);
+      startTransition(() => router.refresh());
+    } catch {
+      setDebts((prev) => prev.filter((d) => d.id !== tempId));
+      toast.error("Erro ao adicionar dívida");
+    }
+  }
+
+  async function handleUpdateDebt(debt: Debt) {
+    setDebts((prev) => prev.map((d) => (d.id === debt.id ? debt : d)));
+    try {
+      await updateDebt(debt);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao atualizar dívida");
+    }
+  }
+
+  async function handleDeleteDebt(id: string) {
+    setDebts((prev) => prev.filter((d) => d.id !== id));
+    try {
+      await deleteDebt(id);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao excluir dívida");
+    }
+  }
+
+  // ── Sign Out ──────────────────────────────────────────────────────────────
+  async function handleSignOut() {
+    await signOut();
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  }
+
+  // ── Reset (limpar todos os dados do usuário) ───────────────────────────────
+  async function handleResetData() {
+    if (!confirm("Tem certeza? Todos os dados serão excluídos permanentemente.")) return;
+    // Limpar cada registro via actions
+    await Promise.all([
+      ...transactions.map((t) => deleteTransaction(t.id)),
+      ...investments.map((i) => deleteInvestment(i.id)),
+      ...debts.map((d) => deleteDebt(d.id)),
+    ]);
+    setTransactions([]);
+    setInvestments([]);
+    setDebts([]);
+    toast.success("Dados resetados");
+    startTransition(() => router.refresh());
   }
 
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar activeView={activeView} onNavigate={setActiveView} />
 
-      {/* Main content */}
-      <div className={cn("flex-1 flex flex-col min-h-screen transition-all duration-300 md:ml-56")}>
+      <div className="flex-1 flex flex-col min-h-screen transition-all duration-300 md:ml-56">
         <Topbar
           activeView={activeView}
           currentMonth={currentMonth}
@@ -69,51 +204,52 @@ export function AppShell() {
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
           onAddTransaction={() => setAddModalOpen(true)}
+          userEmail={userEmail}
+          onSignOut={handleSignOut}
+          isPending={isPending}
         />
 
         <main className="flex-1 overflow-auto">
           {activeView === "dashboard" && (
-            <DashboardView transactions={store.transactions} investments={store.investments} />
+            <DashboardView transactions={transactions} investments={investments} />
           )}
           {activeView === "ledger" && (
             <LedgerView
-              transactions={store.transactions}
-              onAdd={store.addTransaction}
-              onUpdate={store.updateTransaction}
-              onRemove={store.removeTransaction}
+              transactions={transactions}
+              onAdd={handleAddTransaction}
+              onUpdate={handleUpdateTransaction}
+              onRemove={handleDeleteTransaction}
             />
           )}
           {activeView === "gastos" && (
-            <ExpensesRevenuesView transactions={store.transactions} mode="gastos" />
+            <ExpensesRevenuesView transactions={transactions} mode="gastos" />
           )}
           {activeView === "receitas" && (
-            <ExpensesRevenuesView transactions={store.transactions} mode="receitas" />
+            <ExpensesRevenuesView transactions={transactions} mode="receitas" />
           )}
           {activeView === "dividas" && (
             <DebtsView
-              debts={store.debts}
-              onAdd={store.addDebt}
-              onUpdate={store.updateDebt}
-              onRemove={store.removeDebt}
+              debts={debts}
+              onAdd={handleAddDebt}
+              onUpdate={handleUpdateDebt}
+              onRemove={handleDeleteDebt}
             />
           )}
           {activeView === "investimentos" && (
             <InvestmentsView
-              investments={store.investments}
-              usdRate={store.usdRate}
-              onAdd={store.addInvestment}
-              onUpdate={store.updateInvestment}
-              onRemove={store.removeInvestment}
-              onSetUsdRate={store.setUsdRate}
+              investments={investments}
+              usdRate={usdRate}
+              onAdd={handleAddInvestment}
+              onUpdate={handleUpdateInvestment}
+              onRemove={handleDeleteInvestment}
+              onSetUsdRate={setUsdRate}
             />
           )}
           {activeView === "projecoes" && (
-            <ProjectionsView transactions={store.transactions} investments={store.investments} />
+            <ProjectionsView transactions={transactions} investments={investments} />
           )}
           {activeView === "configuracoes" && (
-            <SettingsView
-              onResetData={handleResetData}
-            />
+            <SettingsView onResetData={handleResetData} />
           )}
         </main>
       </div>
@@ -121,7 +257,7 @@ export function AppShell() {
       <AddTransactionModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        onAdd={store.addTransaction}
+        onAdd={handleAddTransaction}
       />
     </div>
   );

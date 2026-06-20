@@ -16,8 +16,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-01",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t002",
@@ -33,8 +31,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-01",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t003",
@@ -50,8 +46,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-01",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t004",
@@ -67,8 +61,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-01",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   // Gastos
   {
@@ -85,8 +77,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pendente",
     dueDate: "2025-06-15",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t006",
@@ -102,8 +92,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pendente",
     dueDate: "2025-06-20",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t007",
@@ -119,8 +107,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Atrasado",
     dueDate: "2025-06-05",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t008",
@@ -136,8 +122,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-05",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t009",
@@ -153,8 +137,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-03",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t010",
@@ -170,8 +152,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-05",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t011",
@@ -187,8 +167,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-08",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   // Investimentos
   {
@@ -205,8 +183,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-01",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
   {
     id: "t013",
@@ -222,8 +198,6 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     status: "Pago",
     dueDate: "2025-06-01",
     recurrence: "Mensal",
-    createdAt: "2025-06-01T08:00:00Z",
-    updatedAt: "2025-06-01T08:00:00Z",
   },
 ];
 
