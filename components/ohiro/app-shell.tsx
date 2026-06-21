@@ -43,6 +43,7 @@ interface AppShellProps {
   initialDebts: Debt[];
   initialNotifications: Notification[];
   initialNotificationDays: number;
+  initialAiConsent: boolean;
 }
 
 export function AppShell({
@@ -52,6 +53,7 @@ export function AppShell({
   initialDebts,
   initialNotifications,
   initialNotificationDays,
+  initialAiConsent,
 }: AppShellProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -317,6 +319,7 @@ export function AppShell({
             <SettingsView
               onResetData={handleResetData}
               initialNotificationDays={initialNotificationDays}
+              initialAiConsent={initialAiConsent}
             />
           )}
         </main>

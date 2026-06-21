@@ -11,6 +11,7 @@ import {
   validateFileType,
   validateFileSize,
   MAX_FILES_PER_REQUEST,
+  RATE_LIMIT_MAX_AI,
 } from "@/lib/security";
 import type { ProviderId } from "@/lib/ai-providers";
 import { getProvider } from "@/lib/ai-providers";
@@ -398,8 +399,8 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Não autenticado" }), { status: 401 });
   }
 
-  // ── Rate limiting por userId ──────────────────────────────────────────────────
-  const { allowed } = checkRateLimit(user.id);
+  // ── Rate limiting por userId (namespace ai: para não colidir com actions) ─────
+  const { allowed } = checkRateLimit(`ai:${user.id}`, RATE_LIMIT_MAX_AI);
   if (!allowed) {
     return new Response(
       JSON.stringify({ error: "Muitas requisições. Aguarde 1 minuto." }),

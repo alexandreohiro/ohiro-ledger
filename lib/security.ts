@@ -23,9 +23,14 @@ export const ALLOWED_EXTENSIONS = new Set([
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 // Máximo de 5 arquivos por request
 export const MAX_FILES_PER_REQUEST = 5;
-// Máximo de mensagens por janela de 1 minuto
-export const RATE_LIMIT_MAX = 15;
+// Janela de 1 minuto
 export const RATE_LIMIT_WINDOW_MS = 60_000;
+// Máximo de requisições por janela — rota de IA
+export const RATE_LIMIT_MAX_AI = 15;
+// Máximo de requisições por janela — actions de mutação
+export const RATE_LIMIT_MAX_ACTION = 60;
+// Retrocompatibilidade
+export const RATE_LIMIT_MAX = RATE_LIMIT_MAX_AI;
 
 // ── Validação de arquivo ───────────────────────────────────────────────────────
 export function validateFileType(mimeType: string, filename: string): boolean {
@@ -55,21 +60,28 @@ export function sanitizeMessage(text: string, maxLength = 4000): string {
 // Em produção, usar Redis/Upstash. Esta implementação é por processo.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-export function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
+/**
+ * @param key  identificador único, ex: `ai:userId` ou `action:userId`
+ * @param max  máximo de requisições por janela (default: RATE_LIMIT_MAX_AI)
+ */
+export function checkRateLimit(
+  key: string,
+  max = RATE_LIMIT_MAX_AI,
+): { allowed: boolean; remaining: number } {
   const now = Date.now();
-  const entry = rateLimitMap.get(userId);
+  const entry = rateLimitMap.get(key);
 
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: max - 1 };
   }
 
-  if (entry.count >= RATE_LIMIT_MAX) {
+  if (entry.count >= max) {
     return { allowed: false, remaining: 0 };
   }
 
   entry.count += 1;
-  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count };
+  return { allowed: true, remaining: max - entry.count };
 }
 
 // ── Extração segura de texto de partes multimodais ────────────────────────────
