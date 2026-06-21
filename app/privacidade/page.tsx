@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { ShieldCheck } from 'lucide-react'
 
 export const metadata = {
-  title: 'Política de Privacidade — Ohiro Ledger',
-  description: 'Como o Ohiro Ledger coleta, usa e protege seus dados pessoais, em conformidade com a LGPD.',
+  title: 'Política de Privacidade — Ohiro',
+  description: 'Como o Ohiro coleta, usa e protege seus dados pessoais, em conformidade com a LGPD.',
 }
 
 export default function PrivacyPolicyPage() {
@@ -19,7 +19,7 @@ export default function PrivacyPolicyPage() {
               Política de Privacidade
             </h1>
             <p className="text-xs text-muted-foreground font-mono tracking-wider mt-1">
-              OHIRO LEDGER
+              OHIRO
             </p>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function PrivacyPolicyPage() {
               1. Controlador dos dados
             </h2>
             <p>
-              O Ohiro Ledger ("nós") é o controlador dos dados pessoais tratados nesta
+              O Ohiro ("nós") é o controlador dos dados pessoais tratados nesta
               plataforma, nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).
             </p>
           </section>

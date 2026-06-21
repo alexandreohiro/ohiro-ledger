@@ -40,7 +40,7 @@ export function SettingsView({ onResetData, initialNotificationDays = 3 }: Setti
         <div className="flex items-center gap-3 mb-4">
           <Shield className="size-5 text-[hsl(var(--accent))]" />
           <span className="text-sm font-mono font-semibold text-foreground">
-            Ohiro Ledger
+            Ohiro
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs font-mono">

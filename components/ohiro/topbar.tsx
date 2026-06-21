@@ -74,7 +74,7 @@ export function Topbar({
       <div className="flex items-center gap-3 ml-10 md:ml-0">
         <div>
           <div className="text-[11px] font-mono text-muted-foreground/60 tracking-widest hidden sm:block">
-            OHIRO LEDGER / {viewLabel}
+            OHIRO / {viewLabel}
           </div>
           <div className="text-sm font-mono font-semibold text-foreground tracking-tight">
             {viewLabel}

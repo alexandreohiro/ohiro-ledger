@@ -44,7 +44,7 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="font-mono text-xl font-bold tracking-widest text-foreground uppercase">
-              Ohiro Ledger
+              Ohiro
             </h1>
             <p className="text-xs text-muted-foreground font-mono tracking-wider mt-1">
               SISTEMA FINANCEIRO TÁTICO

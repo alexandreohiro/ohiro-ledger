@@ -10,7 +10,7 @@ export default function AuthErrorPage() {
             <ShieldAlert className="size-7 text-destructive" />
           </div>
           <h1 className="font-mono text-xl font-bold tracking-widest text-foreground uppercase">
-            Ohiro Ledger
+            Ohiro
           </h1>
         </div>
 

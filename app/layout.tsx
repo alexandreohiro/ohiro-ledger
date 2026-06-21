@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Ohiro Ledger — Carteira Financeira Tática',
+  title: 'Ohiro — Carteira Financeira Tática',
   description: 'Controle financeiro pessoal com alma de planilha, inteligência de dashboard e visual de centro de controle financeiro.',
   generator: 'v0.app',
 }
