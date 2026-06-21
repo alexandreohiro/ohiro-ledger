@@ -194,7 +194,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, stop, regenerate } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/chat",
       prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
@@ -213,10 +213,17 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     }),
     onError: (err) => {
       const msg = err?.message ?? String(err);
-      if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
-        setApiError("Limite de requisições atingido. Aguarde alguns instantes e tente novamente.");
-      } else if (msg.includes("401") || msg.toLowerCase().includes("autenticad")) {
+      const lower = msg.toLowerCase();
+      if (lower.includes("429") || lower.includes("quota") || lower.includes("rate")) {
+        setApiError("Limite de requisições atingido. Aguarde alguns instantes ou troque de modelo.");
+      } else if (msg.includes("401") || lower.includes("autenticad")) {
         setApiError("Sessão expirada. Recarregue a página.");
+      } else if (lower.includes("não suporta") || lower.includes("não configurada")) {
+        // Mensagens já vêm em português e específicas do servidor (ex: provider sem
+        // suporte a arquivos, API key ausente) — mostra direto, sem genericizar.
+        setApiError(msg);
+      } else if (lower.includes("failed to fetch") || lower.includes("network")) {
+        setApiError("Sem conexão com o servidor. Verifique sua internet e tente novamente.");
       } else {
         setApiError("Falha na comunicação com a IA. Verifique sua conexão e tente novamente.");
       }
@@ -554,9 +561,22 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             </div>
             <div className="flex items-center justify-between gap-3 flex-1 rounded-xl px-4 py-3 bg-destructive/5 border border-destructive/20 text-xs font-mono text-destructive">
               <span>{apiError}</span>
-              <button onClick={() => setApiError(null)} aria-label="Fechar erro" className="shrink-0 hover:opacity-70 transition-opacity">
-                <X className="size-3.5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    setApiError(null);
+                    regenerate();
+                  }}
+                  aria-label="Tentar novamente"
+                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md border border-destructive/30 hover:bg-destructive/10 transition-colors"
+                >
+                  <RefreshCw className="size-3" />
+                  Tentar de novo
+                </button>
+                <button onClick={() => setApiError(null)} aria-label="Fechar erro" className="hover:opacity-70 transition-opacity">
+                  <X className="size-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -675,15 +695,27 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             }}
           />
 
-          <Button
-            size="sm"
-            onClick={handleSend}
-            disabled={(!inputValue.trim() && attachedFiles.length === 0) || isStreaming}
-            className="size-10 shrink-0 p-0"
-            aria-label="Enviar mensagem"
-          >
-            {isStreaming ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          </Button>
+          {isStreaming ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => stop()}
+              className="size-10 shrink-0 p-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+              aria-label="Parar resposta"
+            >
+              <XCircle className="size-4" />
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={handleSend}
+              disabled={!inputValue.trim() && attachedFiles.length === 0}
+              className="size-10 shrink-0 p-0"
+              aria-label="Enviar mensagem"
+            >
+              <Send className="size-4" />
+            </Button>
+          )}
         </div>
 
         {(() => {
