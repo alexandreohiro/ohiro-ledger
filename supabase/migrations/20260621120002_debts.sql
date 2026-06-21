@@ -7,7 +7,8 @@ create table if not exists public.debts (
   current_amount numeric(14, 2) not null check (current_amount > 0),
   installment_amount numeric(14, 2) not null default 0 check (installment_amount >= 0),
   due_date date,
-  interest_rate numeric(6, 4) not null default 0 check (interest_rate >= 0 and interest_rate <= 1),
+  -- Convenção: percentual mensal (ex.: 8.5 = 8,5% a.m.), não fração decimal
+  interest_rate numeric(7, 4) not null default 0 check (interest_rate >= 0 and interest_rate <= 100),
   status text not null default 'Ativo' check (status in ('Ativo', 'Quitado', 'Atrasado', 'Renegociado')),
   priority text not null default 'Médio' check (priority in ('Baixo', 'Médio', 'Alto', 'Crítico')),
   created_at timestamptz not null default now()

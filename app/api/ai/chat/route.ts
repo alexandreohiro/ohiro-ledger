@@ -71,7 +71,7 @@ function buildTools(userId: string) {
         currentAmount: z.number().positive(),
         installmentAmount: z.number().min(0).default(0),
         dueDate: z.string().optional().describe("YYYY-MM-DD"),
-        interestRate: z.number().min(0).max(1).default(0).describe("Taxa mensal decimal ex: 0.03 = 3%"),
+        interestRate: z.number().min(0).max(100).default(0).describe("Taxa de juros mensal em pontos percentuais, ex: 3.5 = 3,5% a.m."),
         status: z.enum(["Ativo", "Quitado", "Atrasado", "Renegociado"]).default("Ativo"),
         priority: z.enum(["Baixo", "Médio", "Alto", "Crítico"]).default("Médio"),
       }),

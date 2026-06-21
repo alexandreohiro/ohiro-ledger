@@ -62,6 +62,7 @@ export interface Debt {
   currentAmount: number;
   installmentAmount: number;
   dueDate?: string;
+  /** Percentual mensal, ex.: 8.5 = 8,5% a.m. (não fração decimal) */
   interestRate: number;
   status: DebtStatus;
   priority: DebtPriority;
