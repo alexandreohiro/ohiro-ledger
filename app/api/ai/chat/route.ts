@@ -68,15 +68,15 @@ function buildTools(userId: string) {
         date: z.string().describe("Data no formato YYYY-MM-DD"),
         type: z.enum(["Receita", "Gasto", "Dívida", "Investimento", "Transferência", "Reserva"]),
         category: z.string().describe("Categoria: Alimentação, Salário, Aluguel, Saúde etc."),
-        subcategory: z.string().default(""),
+        subcategory: z.string().optional(),
         description: z.string().max(200),
         amount: z.number().positive(),
-        currency: z.enum(["BRL", "USD", "EUR"]).default("BRL"),
-        exchangeRate: z.number().default(1),
-        status: z.enum(["Previsto", "Pago", "Pendente", "Atrasado", "Recorrente"]).default("Pago"),
+        currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+        exchangeRate: z.number().optional(),
+        status: z.enum(["Previsto", "Pago", "Pendente", "Atrasado", "Recorrente"]).optional(),
         dueDate: z.string().optional(),
-        recurrence: z.enum(["Mensal", "Semanal", "Anual", "Única", "Nenhuma"]).default("Única"),
-        account: z.string().default(""),
+        recurrence: z.enum(["Mensal", "Semanal", "Anual", "Única", "Nenhuma"]).optional(),
+        account: z.string().optional(),
       }),
       execute: async (input) => {
         try {
@@ -86,15 +86,15 @@ function buildTools(userId: string) {
             date: input.date,
             type: input.type,
             category: sanitizeMessage(input.category, 100),
-            subcategory: sanitizeMessage(input.subcategory, 100),
+            subcategory: sanitizeMessage(input.subcategory ?? "", 100),
             description: sanitizeMessage(input.description, 200),
             amount: input.amount,
-            currency: input.currency,
-            exchange_rate: input.exchangeRate,
-            status: input.status,
+            currency: input.currency ?? "BRL",
+            exchange_rate: input.exchangeRate ?? 1,
+            status: input.status ?? "Pago",
             due_date: input.dueDate ?? null,
-            recurrence: input.recurrence,
-            account: sanitizeMessage(input.account, 100),
+            recurrence: input.recurrence ?? "Única",
+            account: sanitizeMessage(input.account ?? "", 100),
           });
           if (error) return { success: false, error: error.message };
           return { success: true, message: `Lançamento "${input.description}" de R$ ${input.amount.toFixed(2)} adicionado.` };
@@ -111,11 +111,11 @@ function buildTools(userId: string) {
         creditor: z.string().max(100),
         originalAmount: z.number().positive(),
         currentAmount: z.number().positive(),
-        installmentAmount: z.number().min(0).default(0),
+        installmentAmount: z.number().min(0).optional(),
         dueDate: z.string().optional().describe("YYYY-MM-DD"),
-        interestRate: z.number().min(0).max(100).default(0).describe("Taxa de juros mensal em pontos percentuais, ex: 3.5 = 3,5% a.m."),
-        status: z.enum(["Ativo", "Quitado", "Atrasado", "Renegociado"]).default("Ativo"),
-        priority: z.enum(["Baixo", "Médio", "Alto", "Crítico"]).default("Médio"),
+        interestRate: z.number().min(0).max(100).optional().describe("Taxa de juros mensal em pontos percentuais, ex: 3.5 = 3,5% a.m."),
+        status: z.enum(["Ativo", "Quitado", "Atrasado", "Renegociado"]).optional(),
+        priority: z.enum(["Baixo", "Médio", "Alto", "Crítico"]).optional(),
       }),
       execute: async (input) => {
         try {
@@ -125,11 +125,11 @@ function buildTools(userId: string) {
             creditor: sanitizeMessage(input.creditor, 100),
             original_amount: input.originalAmount,
             current_amount: input.currentAmount,
-            installment_amount: input.installmentAmount,
+            installment_amount: input.installmentAmount ?? 0,
             due_date: input.dueDate ?? null,
-            interest_rate: input.interestRate,
-            status: input.status,
-            priority: input.priority,
+            interest_rate: input.interestRate ?? 0,
+            status: input.status ?? "Ativo",
+            priority: input.priority ?? "Médio",
           });
           if (error) return { success: false, error: error.message };
           return { success: true, message: `Dívida com ${input.creditor} de R$ ${input.currentAmount.toFixed(2)} registrada.` };
@@ -146,10 +146,10 @@ function buildTools(userId: string) {
         assetName: z.string().max(100),
         class: z.enum(["Renda Fixa", "Renda Variável", "Conta Global", "Cripto", "Reserva de Emergência", "Outros"]),
         amount: z.number().positive(),
-        currency: z.enum(["BRL", "USD", "EUR"]).default("BRL"),
-        exchangeRate: z.number().default(1),
+        currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+        exchangeRate: z.number().optional(),
         convertedAmountBRL: z.number().positive(),
-        monthlyContribution: z.number().min(0).default(0),
+        monthlyContribution: z.number().min(0).optional(),
       }),
       execute: async (input) => {
         try {
@@ -159,10 +159,10 @@ function buildTools(userId: string) {
             asset_name: sanitizeMessage(input.assetName, 100),
             class: input.class,
             amount: input.amount,
-            currency: input.currency,
-            exchange_rate: input.exchangeRate,
+            currency: input.currency ?? "BRL",
+            exchange_rate: input.exchangeRate ?? 1,
             converted_amount_brl: input.convertedAmountBRL,
-            monthly_contribution: input.monthlyContribution,
+            monthly_contribution: input.monthlyContribution ?? 0,
           });
           if (error) return { success: false, error: error.message };
           return { success: true, message: `Investimento "${input.assetName}" de R$ ${input.convertedAmountBRL.toFixed(2)} registrado.` };
@@ -215,7 +215,7 @@ function buildTools(userId: string) {
         category: z.string().optional(),
         dateFrom: z.string().optional().describe("YYYY-MM-DD"),
         dateTo: z.string().optional().describe("YYYY-MM-DD"),
-        limit: z.number().min(1).max(30).default(10),
+        limit: z.number().min(1).max(30).optional(),
       }),
       execute: async (input) => {
         try {
@@ -225,7 +225,7 @@ function buildTools(userId: string) {
             .select("id,date,type,category,description,amount,status,account")
             .eq("user_id", userId)
             .order("date", { ascending: false })
-            .limit(input.limit);
+            .limit(input.limit ?? 10);
 
           if (input.type) q = q.eq("type", input.type);
           if (input.category) q = q.ilike("category", `%${input.category}%`);
