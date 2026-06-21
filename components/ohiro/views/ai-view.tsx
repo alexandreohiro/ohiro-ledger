@@ -69,27 +69,40 @@ function buildFinancialContext(
     .slice(0, 5);
   const activeDebts = debts.filter((d) => d.status === "Ativo" || d.status === "Atrasado");
 
+  // Agrupa gastos por categoria
+  const byCategory: Record<string, number> = {};
+  transactions
+    .filter((t) => t.type === "Gasto")
+    .forEach((t) => { byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount; });
+  const topCategories = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
   return [
-    "### Resumo Financeiro",
-    `- Receitas: ${formatCurrency(summary.totalRevenue)}`,
-    `- Gastos: ${formatCurrency(summary.totalExpenses)}`,
+    "### Resumo Financeiro Atual",
+    `- Receitas totais: ${formatCurrency(summary.totalRevenue)}`,
+    `- Gastos totais: ${formatCurrency(summary.totalExpenses)}`,
     `- Saldo livre: ${formatCurrency(summary.freeBalance)}`,
-    `- Total dívidas: ${formatCurrency(summary.totalDebts)}`,
+    `- Total dívidas ativas: ${formatCurrency(summary.totalDebts)}`,
     `- Total investimentos: ${formatCurrency(summary.totalInvestments)}`,
     `- Patrimônio líquido: ${formatCurrency(summary.totalPatrimony)}`,
-    `- Comprometimento renda: ${summary.incomeCommitment.toFixed(1)}%`,
-    `- Taxa investimento: ${summary.investmentRate.toFixed(1)}%`,
+    `- Comprometimento da renda: ${summary.incomeCommitment.toFixed(1)}%`,
+    `- Taxa de investimento: ${summary.investmentRate.toFixed(1)}%`,
     `- Nível de risco: ${summary.riskLevel}`,
+    `- Total de lançamentos: ${transactions.length}`,
     "",
-    "### Top 5 Maiores Gastos",
+    "### Gastos por Categoria (maiores)",
+    ...topCategories.map(([cat, val]) => `- ${cat}: ${formatCurrency(val)}`),
+    "",
+    "### Top 5 Maiores Gastos (com IDs para edição)",
     ...topExpenses.map(
-      (t) => `- ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date}`
+      (t) => `- ID:${t.id} | ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`
     ),
     "",
-    "### Dívidas Ativas",
+    "### Dívidas Ativas (com IDs para edição)",
     ...activeDebts.map(
       (d) =>
-        `- ${d.creditor}: ${formatCurrency(d.currentAmount)} | parcela: ${formatCurrency(d.installmentAmount)} | ${(d.interestRate * 100).toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
+        `- ID:${d.id} | ${d.creditor}: saldo ${formatCurrency(d.currentAmount)} | parcela ${formatCurrency(d.installmentAmount)} | ${(d.interestRate * 100).toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
     ),
     "",
     "### Carteira de Investimentos",
@@ -98,10 +111,10 @@ function buildFinancialContext(
         `- ${i.assetName} (${i.class}): ${formatCurrency(i.convertedAmountBRL)} | aporte: ${formatCurrency(i.monthlyContribution)}/mês`
     ),
     "",
-    "### Últimos 10 Lançamentos",
+    "### Últimos 15 Lançamentos (com IDs para edição)",
     ...transactions
-      .slice(0, 10)
-      .map((t) => `- [${t.type}] ${t.description}: ${formatCurrency(t.amount)} — ${t.date} (${t.status})`),
+      .slice(0, 15)
+      .map((t) => `- ID:${t.id} | [${t.type}] ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`),
   ].join("\n");
 }
 
@@ -109,22 +122,32 @@ const QUICK_PROMPTS = [
   {
     icon: AlertTriangle,
     label: "Análise de risco",
-    text: "Analise meu nível de risco financeiro atual e quais são os maiores pontos de atenção.",
+    text: "Leia meus dados atuais e analise meu nível de risco financeiro. Quais são os maiores pontos de atenção?",
   },
   {
     icon: TrendingUp,
     label: "Estratégia de dívidas",
-    text: "Qual a melhor estratégia para quitar minhas dívidas mais rápido e pagar menos juros?",
+    text: "Quais dívidas devo priorizar para quitar primeiro? Calcule o custo total de cada uma e sugira uma ordem de pagamento.",
   },
   {
     icon: BarChart3,
-    label: "Saúde dos investimentos",
-    text: "Como está minha carteira de investimentos? Está diversificada? O que posso melhorar?",
+    label: "Resumo do mês",
+    text: "Faça um resumo completo do mês atual: receitas, gastos por categoria, saldo livre e comparação com o que é ideal.",
   },
   {
     icon: Sparkles,
-    label: "Oportunidades de economia",
-    text: "Em quais categorias posso cortar despesas para melhorar minha saúde financeira?",
+    label: "Onde economizar",
+    text: "Analise meus gastos e aponte as 3 categorias onde estou gastando mais do que deveria, com sugestões práticas de corte.",
+  },
+  {
+    icon: Database,
+    label: "Listar lançamentos",
+    text: "Liste meus últimos 20 lançamentos com ID, data, descrição e valor para eu poder revisar.",
+  },
+  {
+    icon: PlusCircle,
+    label: "Registrar contracheque",
+    text: "Quero registrar meu contracheque. Me diga quais informações preciso fornecer ou envie a imagem diretamente.",
   },
 ];
 
@@ -601,10 +624,14 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 // ── Tool card — exibe status de execução de tools ─────────────────────────────
 function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
   const toolLabels: Record<string, { label: string; icon: React.ElementType }> = {
-    addTransaction: { label: "Registrando lançamento", icon: PlusCircle },
-    upsertDebt: { label: "Registrando dívida", icon: PlusCircle },
-    upsertInvestment: { label: "Registrando investimento", icon: PlusCircle },
-    readFinancialData: { label: "Lendo dados financeiros", icon: Database },
+    addTransaction:       { label: "Registrando lançamento",      icon: PlusCircle },
+    upsertDebt:           { label: "Registrando dívida",           icon: PlusCircle },
+    upsertInvestment:     { label: "Registrando investimento",     icon: PlusCircle },
+    readFinancialData:    { label: "Lendo dados financeiros",      icon: Database },
+    searchTransactions:   { label: "Buscando lançamentos",         icon: Database },
+    updateTransaction:    { label: "Atualizando lançamento",       icon: RefreshCw },
+    deleteTransaction:    { label: "Removendo lançamento",         icon: XCircle },
+    updateDebt:           { label: "Atualizando dívida",           icon: RefreshCw },
   };
 
   const info = toolLabels[part.toolName ?? ""] ?? { label: part.toolName ?? "Tool", icon: Database };
