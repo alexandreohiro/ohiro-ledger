@@ -192,6 +192,14 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   // Ref com arquivos aguardando ser associados à próxima mensagem do usuário
   const nextMsgFilesRef = useRef<AttachedFile[]>([]);
 
+  // useChat cria a instância de chat (e o transport) apenas uma vez no mount,
+  // então prepareSendMessagesRequest fica com um closure "congelado". Refs
+  // garantem que cada envio use o provider e o contexto financeiro atuais.
+  const selectedProviderRef = useRef(selectedProvider);
+  selectedProviderRef.current = selectedProvider;
+  const financialContextRef = useRef(financialContext);
+  financialContextRef.current = financialContext;
+
   const [apiError, setApiError] = useState<string | null>(null);
 
   const { messages, sendMessage, status, stop, regenerate } = useChat({
@@ -201,8 +209,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         body: {
           id,
           messages: msgs,
-          context: financialContext,
-          provider: selectedProvider,
+          context: financialContextRef.current,
+          provider: selectedProviderRef.current,
           files: pendingFilesRef.current.map((f) => ({
             name: f.name,
             type: f.type,
