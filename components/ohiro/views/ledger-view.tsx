@@ -2,17 +2,29 @@
 
 import { useState, useMemo } from "react";
 import { Transaction, TransactionType, TransactionStatus } from "@/lib/types";
-import { formatCurrency, getAmountInBRL, calcTotalRevenue, calcTotalExpenses, calcTotalDebts, calcTotalInvestments } from "@/lib/calculations";
+import {
+  formatCurrency,
+  getAmountInBRL,
+  calcTotalRevenue,
+  calcTotalExpenses,
+  calcTotalDebts,
+  calcTotalInvestments,
+  formatMonthLabel,
+  txMonthKey,
+} from "@/lib/calculations";
 import { StatusBadge, CurrencyBadge } from "../risk-badge";
 import { AddTransactionModal } from "../add-transaction-modal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Plus, Search, Filter } from "lucide-react";
+import { Pencil, Trash2, Plus, Search, Filter, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LedgerViewProps {
   transactions: Transaction[];
+  selectedMonthKey: string;
+  availableMonths: string[];
+  onSelectMonth: (key: string) => void;
   onAdd: (t: Transaction) => void;
   onUpdate: (t: Transaction) => void;
   onRemove: (id: string) => void;
@@ -36,16 +48,76 @@ const TYPE_DOT: Record<TransactionType, string> = {
   Reserva: "bg-foreground",
 };
 
-export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerViewProps) {
+// ── Month summary row ─────────────────────────────────────────────────────────
+function MonthSummaryRow({ monthKey, transactions, isOpen, onToggle, onAdd }: {
+  monthKey: string;
+  transactions: Transaction[];
+  isOpen: boolean;
+  onToggle: () => void;
+  onAdd: () => void;
+}) {
+  const receita = calcTotalRevenue(transactions);
+  const gastos = calcTotalExpenses(transactions);
+  const dividas = calcTotalDebts(transactions);
+  const investimentos = calcTotalInvestments(transactions);
+  const saldo = receita - gastos - dividas - investimentos;
+
+  return (
+    <div
+      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 bg-muted/30 border-b border-border/40 cursor-pointer hover:bg-muted/50 transition-colors select-none"
+      onClick={onToggle}
+    >
+      <div className="flex items-center gap-2">
+        {isOpen ? (
+          <ChevronDown className="size-4 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+        )}
+        <span className="text-sm font-mono font-semibold text-foreground">
+          {formatMonthLabel(monthKey)}
+        </span>
+        <span className="text-[11px] font-mono text-muted-foreground">
+          {transactions.length} lançamento{transactions.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="flex items-center gap-4 ml-6 sm:ml-0 flex-wrap">
+        <span className="text-xs font-mono text-[hsl(var(--risk-low))]">+{formatCurrency(receita)}</span>
+        <span className="text-xs font-mono text-[hsl(var(--risk-medium))]">-{formatCurrency(gastos)}</span>
+        {dividas > 0 && <span className="text-xs font-mono text-[hsl(var(--risk-critical))]">-{formatCurrency(dividas)}</span>}
+        {investimentos > 0 && <span className="text-xs font-mono text-[hsl(var(--accent))]">-{formatCurrency(investimentos)}</span>}
+        <span className={cn("text-xs font-mono font-bold", saldo >= 0 ? "text-[hsl(var(--risk-low))]" : "text-[hsl(var(--risk-critical))]")}>
+          = {saldo >= 0 ? "+" : ""}{formatCurrency(saldo)}
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onAdd(); }}
+          className="ml-1 p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Adicionar lançamento"
+          title="Adicionar lançamento"
+        >
+          <Plus className="size-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function LedgerView({ transactions, selectedMonthKey, availableMonths, onSelectMonth, onAdd, onUpdate, onRemove }: LedgerViewProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [openMonths, setOpenMonths] = useState<Set<string>>(() => new Set([selectedMonthKey]));
+
+  // Abre automaticamente o mês selecionado quando muda
+  useMemo(() => {
+    setOpenMonths((prev) => new Set([...prev, selectedMonthKey]));
+  }, [selectedMonthKey]);
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
-      const matchSearch = search === "" ||
+      const matchSearch =
+        search === "" ||
         t.description.toLowerCase().includes(search.toLowerCase()) ||
         t.category.toLowerCase().includes(search.toLowerCase());
       const matchType = filterType === "all" || t.type === filterType;
@@ -54,12 +126,45 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
     });
   }, [transactions, search, filterType, filterStatus]);
 
-  const totals = useMemo(() => ({
+  // Agrupa por mês na ordem reversa (mais recente primeiro)
+  const groupedByMonth = useMemo(() => {
+    const map: Record<string, Transaction[]> = {};
+    for (const t of filtered) {
+      const key = txMonthKey(t.date);
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    }
+    // Sort transactions dentro de cada mês por data desc
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+    return map;
+  }, [filtered]);
+
+  // Meses disponíveis na view (os que têm lançamentos filtrados, mais o mês selecionado)
+  const displayMonths = useMemo(() => {
+    const fromFiltered = Object.keys(groupedByMonth).sort().reverse();
+    if (!fromFiltered.includes(selectedMonthKey)) {
+      return [selectedMonthKey, ...fromFiltered];
+    }
+    return fromFiltered;
+  }, [groupedByMonth, selectedMonthKey]);
+
+  const allTotal = useMemo(() => ({
     receita: calcTotalRevenue(filtered),
     gastos: calcTotalExpenses(filtered),
     dividas: calcTotalDebts(filtered),
     investimentos: calcTotalInvestments(filtered),
   }), [filtered]);
+
+  function toggleMonth(key: string) {
+    setOpenMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function handleEdit(t: Transaction) {
     setEditTx(t);
@@ -67,11 +172,8 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
   }
 
   function handleSave(t: Transaction) {
-    if (editTx) {
-      onUpdate(t);
-    } else {
-      onAdd(t);
-    }
+    if (editTx) onUpdate(t);
+    else onAdd(t);
     setEditTx(null);
   }
 
@@ -82,6 +184,7 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6 max-w-[1400px] mx-auto">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -89,26 +192,22 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
             Ledger Operacional
           </div>
           <div className="text-sm font-mono font-semibold text-foreground">
-            {filtered.length} lançamentos
+            {filtered.length} lançamentos em {displayMonths.length} meses
           </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setModalOpen(true)}
-          className="font-mono text-xs h-8"
-        >
+        <Button size="sm" onClick={() => setModalOpen(true)} className="font-mono text-xs h-8">
           <Plus className="size-3.5" data-icon="inline-start" />
           Novo lançamento
         </Button>
       </div>
 
-      {/* Totals row */}
+      {/* Totals */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Receitas", value: totals.receita, color: "text-[hsl(var(--risk-low))]", border: "border-[hsl(var(--risk-low))/20]" },
-          { label: "Gastos", value: totals.gastos, color: "text-[hsl(var(--risk-medium))]", border: "border-[hsl(var(--risk-medium))/20]" },
-          { label: "Dívidas", value: totals.dividas, color: "text-[hsl(var(--risk-critical))]", border: "border-[hsl(var(--risk-critical))/20]" },
-          { label: "Investimentos", value: totals.investimentos, color: "text-[hsl(var(--accent))]", border: "border-[hsl(var(--accent))/20]" },
+          { label: "Receitas", value: allTotal.receita, color: "text-[hsl(var(--risk-low))]", border: "border-[hsl(var(--risk-low))/20]" },
+          { label: "Gastos", value: allTotal.gastos, color: "text-[hsl(var(--risk-medium))]", border: "border-[hsl(var(--risk-medium))/20]" },
+          { label: "Dívidas", value: allTotal.dividas, color: "text-[hsl(var(--risk-critical))]", border: "border-[hsl(var(--risk-critical))/20]" },
+          { label: "Investimentos", value: allTotal.investimentos, color: "text-[hsl(var(--accent))]", border: "border-[hsl(var(--accent))/20]" },
         ].map((item) => (
           <div key={item.label} className={cn("p-3 rounded-md border bg-card/40", item.border)}>
             <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase">{item.label}</div>
@@ -129,14 +228,14 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
           />
         </div>
         <div className="flex gap-2">
-          <Filter className="size-4 text-muted-foreground self-center" />
+          <Filter className="size-4 text-muted-foreground self-center shrink-0" />
           <Select value={filterType} onValueChange={(v) => setFilterType(v ?? "all")}>
             <SelectTrigger className="h-8 w-[130px] text-xs font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-xs font-mono">Todos tipos</SelectItem>
-              {["Receita", "Gasto", "Dívida", "Investimento", "Transferência", "Reserva"].map((t) => (
+              {(["Receita", "Gasto", "Dívida", "Investimento", "Transferência", "Reserva"] as TransactionType[]).map((t) => (
                 <SelectItem key={t} value={t} className="text-xs font-mono">{t}</SelectItem>
               ))}
             </SelectContent>
@@ -147,7 +246,7 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-xs font-mono">Todos status</SelectItem>
-              {["Previsto", "Pago", "Pendente", "Atrasado", "Recorrente"].map((s) => (
+              {(["Previsto", "Pago", "Pendente", "Atrasado", "Recorrente"] as TransactionStatus[]).map((s) => (
                 <SelectItem key={s} value={s} className="text-xs font-mono">{s}</SelectItem>
               ))}
             </SelectContent>
@@ -155,96 +254,118 @@ export function LedgerView({ transactions, onAdd, onUpdate, onRemove }: LedgerVi
         </div>
       </div>
 
-      {/* Table */}
+      {/* Grouped months */}
       <div className="rounded-lg border border-border/40 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs font-mono">
-            <thead>
-              <tr className="border-b border-border/40 bg-muted/20">
-                {["Data", "Tipo", "Descrição", "Conta", "Categoria", "Valor", "Moeda", "Status", "Venc.", "Recorr.", ""].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-3 py-2.5 text-[10px] tracking-widest uppercase text-muted-foreground/70 font-semibold whitespace-nowrap"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="text-center py-12 text-muted-foreground">
-                    <div className="font-mono text-sm">Nenhum lançamento encontrado</div>
-                    <div className="text-[11px] mt-1">Ajuste os filtros ou adicione um lançamento</div>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((t, idx) => (
-                  <tr
-                    key={t.id}
-                    className={cn(
-                      "border-b border-border/20 transition-colors hover:bg-muted/20",
-                      idx % 2 === 0 ? "bg-transparent" : "bg-card/20"
+        {displayMonths.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground font-mono text-sm">
+            Nenhum lançamento encontrado
+          </div>
+        ) : (
+          displayMonths.map((monthKey) => {
+            const monthTxns = groupedByMonth[monthKey] ?? [];
+            const isOpen = openMonths.has(monthKey);
+
+            return (
+              <div key={monthKey} className="border-b border-border/30 last:border-0">
+                <MonthSummaryRow
+                  monthKey={monthKey}
+                  transactions={monthTxns}
+                  isOpen={isOpen}
+                  onToggle={() => toggleMonth(monthKey)}
+                  onAdd={() => setModalOpen(true)}
+                />
+
+                {isOpen && (
+                  <div className="overflow-x-auto">
+                    {monthTxns.length === 0 ? (
+                      <div className="py-6 text-center text-muted-foreground text-xs font-mono">
+                        Nenhum lançamento{search || filterType !== "all" || filterStatus !== "all" ? " com os filtros atuais" : ""} em {formatMonthLabel(monthKey)}
+                      </div>
+                    ) : (
+                      <table className="w-full text-xs font-mono">
+                        <thead>
+                          <tr className="border-b border-border/30 bg-muted/10">
+                            {["Data", "Tipo", "Descrição", "Conta", "Categoria", "Valor", "Moeda", "Status", "Venc.", "Recorr.", ""].map((h) => (
+                              <th
+                                key={h}
+                                className="text-left px-3 py-2 text-[10px] tracking-widest uppercase text-muted-foreground/60 font-semibold whitespace-nowrap"
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {monthTxns.map((t, idx) => (
+                            <tr
+                              key={t.id}
+                              className={cn(
+                                "border-b border-border/20 transition-colors hover:bg-muted/20",
+                                idx % 2 === 0 ? "bg-transparent" : "bg-card/20"
+                              )}
+                            >
+                              <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.date}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={cn("size-1.5 rounded-full shrink-0", TYPE_DOT[t.type])} />
+                                  <span className={cn("font-medium", TYPE_COLORS[t.type])}>{t.type}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5 max-w-[180px]">
+                                <div className="truncate text-foreground font-medium">{t.description}</div>
+                                {t.subcategory && (
+                                  <div className="text-[10px] text-muted-foreground truncate">{t.subcategory}</div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.account}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.category}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <span className={cn("font-bold", TYPE_COLORS[t.type])}>
+                                  {t.type === "Receita" ? "+" : "-"}{formatCurrency(getAmountInBRL(t))}
+                                </span>
+                                {t.currency !== "BRL" && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {t.currency} {t.amount.toFixed(2)}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <CurrencyBadge currency={t.currency} />
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <StatusBadge status={t.status} />
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.dueDate ?? "—"}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.recurrence}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleEdit(t)}
+                                    className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors"
+                                    aria-label="Editar"
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => onRemove(t.id)}
+                                    className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors"
+                                    aria-label="Remover"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     )}
-                  >
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.date}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn("size-1.5 rounded-full shrink-0", TYPE_DOT[t.type])} />
-                        <span className={cn("font-medium", TYPE_COLORS[t.type])}>{t.type}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 max-w-[180px]">
-                      <div className="truncate text-foreground font-medium">{t.description}</div>
-                      {t.subcategory && (
-                        <div className="text-[10px] text-muted-foreground truncate">{t.subcategory}</div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.account}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.category}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span className={cn("font-bold", TYPE_COLORS[t.type])}>
-                        {t.type === "Receita" ? "+" : "-"}{formatCurrency(getAmountInBRL(t))}
-                      </span>
-                      {t.currency !== "BRL" && (
-                        <div className="text-[10px] text-muted-foreground">
-                          {t.currency} {t.amount.toFixed(2)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <CurrencyBadge currency={t.currency} />
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.dueDate}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.recurrence}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEdit(t)}
-                          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Editar"
-                        >
-                          <Pencil className="size-3.5" />
-                        </button>
-                        <button
-                          onClick={() => onRemove(t.id)}
-                          className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors"
-                          aria-label="Remover"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       <AddTransactionModal

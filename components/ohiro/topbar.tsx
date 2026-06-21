@@ -32,6 +32,9 @@ interface TopbarProps {
   onSignOut?: () => void;
   isPending?: boolean;
   notifications?: Notification[];
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  availableMonthsCount?: number;
   className?: string;
 }
 
@@ -59,6 +62,8 @@ export function Topbar({
   onSignOut,
   isPending,
   notifications = [],
+  hasPrev = true,
+  hasNext = true,
   className,
 }: TopbarProps) {
   const viewLabel = viewLabels[activeView] ?? activeView.toUpperCase();
@@ -86,7 +91,8 @@ export function Topbar({
       <div className="flex items-center gap-1">
         <button
           onClick={onPrevMonth}
-          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors"
+          disabled={!hasPrev}
+          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
           aria-label="Mês anterior"
         >
           <ChevronLeft className="size-4" />
@@ -98,7 +104,8 @@ export function Topbar({
         </div>
         <button
           onClick={onNextMonth}
-          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors"
+          disabled={!hasNext}
+          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
           aria-label="Próximo mês"
         >
           <ChevronRight className="size-4" />

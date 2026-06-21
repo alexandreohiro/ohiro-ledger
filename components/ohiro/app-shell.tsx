@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ActiveView, Transaction, Investment, Debt } from "@/lib/types";
-import { calcFinancialSummary } from "@/lib/calculations";
+import {
+  calcFinancialSummary,
+  filterByMonth,
+  getAvailableMonths,
+  formatMonthYear,
+} from "@/lib/calculations";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { AddTransactionModal } from "./add-transaction-modal";
@@ -50,8 +55,6 @@ export function AppShell({
 }: AppShellProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [usdRate, setUsdRate] = useState(5.05);
 
   // Otimistic local state — revalidado pelo servidor via revalidatePath
@@ -62,15 +65,42 @@ export function AppShell({
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const summary = calcFinancialSummary(transactions, investments);
+  // ── Meses disponíveis (baseados nos lançamentos reais) ────────────────────
+  const availableMonths = useMemo(() => {
+    const keys = getAvailableMonths(transactions);
+    // Garante que o mês atual sempre aparece mesmo sem lançamentos
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (!keys.includes(currentKey)) keys.push(currentKey);
+    return keys.sort();
+  }, [transactions]);
+
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  const currentMonthIndex = availableMonths.indexOf(selectedMonthKey);
+  const [currentYear, currentMonth] = selectedMonthKey.split("-").map(Number);
+  // currentMonth here is 1-indexed; views expect 0-indexed
+  const currentMonthZero = currentMonth - 1;
+
+  const monthTransactions = useMemo(
+    () => filterByMonth(transactions, currentMonthZero, currentYear),
+    [transactions, currentMonthZero, currentYear]
+  );
+
+  const summary = calcFinancialSummary(monthTransactions, investments);
 
   function handlePrevMonth() {
-    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear((y) => y - 1); }
-    else setCurrentMonth((m) => m - 1);
+    if (currentMonthIndex > 0) {
+      setSelectedMonthKey(availableMonths[currentMonthIndex - 1]);
+    }
   }
   function handleNextMonth() {
-    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); }
-    else setCurrentMonth((m) => m + 1);
+    if (currentMonthIndex < availableMonths.length - 1) {
+      setSelectedMonthKey(availableMonths[currentMonthIndex + 1]);
+    }
   }
 
   // ── Transactions ──────────────────────────────────────────────────────────
@@ -204,7 +234,7 @@ export function AppShell({
       <div className="flex-1 flex flex-col min-h-screen transition-all duration-300 md:ml-56">
         <Topbar
           activeView={activeView}
-          currentMonth={currentMonth}
+          currentMonth={currentMonthZero}
           currentYear={currentYear}
           riskLevel={summary.riskLevel}
           onPrevMonth={handlePrevMonth}
@@ -214,25 +244,46 @@ export function AppShell({
           onSignOut={handleSignOut}
           isPending={isPending}
           notifications={initialNotifications}
+          hasPrev={currentMonthIndex > 0}
+          hasNext={currentMonthIndex < availableMonths.length - 1}
+          availableMonthsCount={availableMonths.length}
         />
 
         <main className="flex-1 overflow-auto">
           {activeView === "dashboard" && (
-            <DashboardView transactions={transactions} investments={investments} />
+            <DashboardView
+              transactions={transactions}
+              monthTransactions={monthTransactions}
+              investments={investments}
+              selectedMonthKey={selectedMonthKey}
+            />
           )}
           {activeView === "ledger" && (
             <LedgerView
               transactions={transactions}
+              selectedMonthKey={selectedMonthKey}
+              availableMonths={availableMonths}
+              onSelectMonth={setSelectedMonthKey}
               onAdd={handleAddTransaction}
               onUpdate={handleUpdateTransaction}
               onRemove={handleDeleteTransaction}
             />
           )}
           {activeView === "gastos" && (
-            <ExpensesRevenuesView transactions={transactions} mode="gastos" />
+            <ExpensesRevenuesView
+              transactions={transactions}
+              monthTransactions={monthTransactions}
+              selectedMonthKey={selectedMonthKey}
+              mode="gastos"
+            />
           )}
           {activeView === "receitas" && (
-            <ExpensesRevenuesView transactions={transactions} mode="receitas" />
+            <ExpensesRevenuesView
+              transactions={transactions}
+              monthTransactions={monthTransactions}
+              selectedMonthKey={selectedMonthKey}
+              mode="receitas"
+            />
           )}
           {activeView === "dividas" && (
             <DebtsView
