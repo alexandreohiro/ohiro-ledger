@@ -869,7 +869,7 @@ function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: P
 }
 
 // ── File thumbnail — miniatura de arquivo anexado, estilo Claude Code ─────────
-function FileThumbnail({
+export function FileThumbnail({
   file,
   onRemove,
 }: {
@@ -922,7 +922,7 @@ function FileThumbnail({
 }
 
 // ── Tool card — exibe status de execução de tools ─────────────────────────────
-function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
+export function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
   const toolLabels: Record<string, { label: string; icon: React.ElementType }> = {
     addTransaction:       { label: "Registrando lançamento",      icon: PlusCircle },
     upsertDebt:           { label: "Registrando dívida",           icon: PlusCircle },
@@ -1033,7 +1033,7 @@ function WelcomeState({
 }
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
-function MarkdownText({ text }: { text: string }) {
+export function MarkdownText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
     <div className="space-y-1">

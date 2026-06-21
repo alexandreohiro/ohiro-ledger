@@ -16,3 +16,8 @@ node_modules
 .vercel
 .github/workflows/
 next-env.d.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
