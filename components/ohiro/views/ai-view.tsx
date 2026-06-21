@@ -614,7 +614,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         </div>
 
         <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
-          Vercel AI Gateway · Gemini 2.0 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
+          Google AI · Gemini 2.5 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
         </p>
       </div>
     </div>

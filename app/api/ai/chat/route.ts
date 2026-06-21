@@ -1,3 +1,4 @@
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -11,8 +12,13 @@ import {
 
 export const maxDuration = 60;
 
-// Usa Vercel AI Gateway — zero config, sem necessidade de chave própria
-const AI_MODEL = "google/gemini-2.0-flash";
+// Usa @ai-sdk/google diretamente com GEMINI_API_KEY
+function getGeminiModel() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
+  const google = createGoogleGenerativeAI({ apiKey });
+  return google("gemini-2.5-flash");
+}
 
 // ── Tools de mutação de dados (scoped por userId) ─────────────────────────────
 function buildTools(userId: string) {
@@ -477,8 +483,9 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
 
   // ── Streaming ─────────────────────────────────────────────────────────────────
   try {
+    const model = getGeminiModel();
     const result = streamText({
-      model: AI_MODEL,
+      model,
       system: systemPrompt,
       messages: modelMessages,
       tools: buildTools(user.id),
@@ -497,6 +504,12 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
       return new Response(
         JSON.stringify({ error: "Limite de requisições da API atingido. Tente novamente em alguns instantes." }),
         { status: 429 }
+      );
+    }
+    if (msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("gemini_api_key")) {
+      return new Response(
+        JSON.stringify({ error: "GEMINI_API_KEY não configurada. Adicione a chave em Vars nas configurações do projeto." }),
+        { status: 500 }
       );
     }
     return new Response(
