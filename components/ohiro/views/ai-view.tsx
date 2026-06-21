@@ -522,20 +522,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                   {isUser && sentFilesMap[msg.id]?.length > 0 && (
                     <div className="flex gap-2 flex-wrap justify-end">
                       {sentFilesMap[msg.id].map((f) => (
-                        <div
-                          key={f.id}
-                          className="flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 rounded-lg border border-border/40 bg-muted/20 text-[10px] font-mono text-muted-foreground max-w-[180px]"
-                        >
-                          {f.preview ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={f.preview} alt={f.name} className="size-8 rounded object-cover shrink-0" />
-                          ) : f.type === "application/pdf" ? (
-                            <FileText className="size-4 text-destructive/70 shrink-0" />
-                          ) : (
-                            <FileText className="size-4 text-muted-foreground/60 shrink-0" />
-                          )}
-                          <span className="truncate">{f.name}</span>
-                        </div>
+                        <FileThumbnail key={f.id} file={f} />
                       ))}
                     </div>
                   )}
@@ -636,31 +623,11 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           </div>
         )}
 
-        {/* Attached files preview */}
+        {/* Attached files preview — sempre com miniatura, estilo Claude Code */}
         {attachedFiles.length > 0 && (
           <div className="flex gap-2 mb-2 flex-wrap">
             {attachedFiles.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg border border-border/40 bg-muted/20 text-[10px] font-mono text-muted-foreground max-w-[160px] group"
-              >
-                {f.preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.preview} alt={f.name} className="size-5 rounded object-cover shrink-0" />
-                ) : f.type === "application/pdf" ? (
-                  <FileText className="size-4 text-destructive/70 shrink-0" />
-                ) : (
-                  <FileText className="size-4 text-muted-foreground/60 shrink-0" />
-                )}
-                <span className="truncate">{f.name}</span>
-                <button
-                  onClick={() => removeFile(f.id)}
-                  aria-label={`Remover ${f.name}`}
-                  className="ml-1 hover:text-foreground transition-colors shrink-0"
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
+              <FileThumbnail key={f.id} file={f} onRemove={() => removeFile(f.id)} />
             ))}
           </div>
         )}
@@ -865,6 +832,59 @@ function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: P
       <p className="text-[9px] font-mono text-muted-foreground/40 mt-3 text-center">
         Cada modelo requer uma chave de API própria configurada em Vars · O uso exibido é estimado localmente
       </p>
+    </div>
+  );
+}
+
+// ── File thumbnail — miniatura de arquivo anexado, estilo Claude Code ─────────
+function FileThumbnail({
+  file,
+  onRemove,
+}: {
+  file: AttachedFile;
+  onRemove?: () => void;
+}) {
+  const ext = file.name.split(".").pop()?.toUpperCase() ?? "FILE";
+  const sizeLabel = file.size < 1024 * 1024
+    ? `${Math.round(file.size / 1024)} KB`
+    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+  return (
+    <div className="relative flex items-center gap-2 pr-2.5 py-1.5 pl-1.5 rounded-lg border border-border/50 bg-card/60 max-w-[200px] group shrink-0">
+      {file.preview ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={file.preview}
+          alt={file.name}
+          className="size-9 rounded-md object-cover shrink-0 border border-border/40"
+        />
+      ) : (
+        <div
+          className={cn(
+            "flex items-center justify-center size-9 rounded-md shrink-0 border",
+            file.type === "application/pdf"
+              ? "bg-destructive/10 border-destructive/25 text-destructive"
+              : "bg-primary/10 border-primary/20 text-primary"
+          )}
+        >
+          <FileText className="size-4" />
+        </div>
+      )}
+      <div className="flex flex-col min-w-0 leading-tight">
+        <span className="text-[10px] font-mono text-foreground truncate max-w-[110px]">{file.name}</span>
+        <span className="text-[9px] font-mono text-muted-foreground/70 tracking-wide">
+          {ext} · {sizeLabel}
+        </span>
+      </div>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          aria-label={`Remover ${file.name}`}
+          className="absolute -top-1.5 -right-1.5 flex items-center justify-center size-4 rounded-full bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+        >
+          <X className="size-2.5" />
+        </button>
+      )}
     </div>
   );
 }
