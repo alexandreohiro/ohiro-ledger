@@ -571,6 +571,19 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
     );
   }
 
+  // O provider escolhido pelo usuário não tem API key configurada na Vercel:
+  // falha explicitamente em vez de cair silenciosamente para outro provider
+  // (ex: usuário seleciona Groq mas o backend usa Gemini sem avisar, e se o
+  // Gemini estiver com cota esgotada o usuário só vê um erro genérico).
+  if (!isProviderConfigured(providerId)) {
+    return new Response(
+      JSON.stringify({
+        error: `${getProvider(providerId).label} (${getProvider(providerId).modelLabel}) não configurada neste ambiente. Adicione ${PROVIDER_ENV_KEYS[providerId]} nas variáveis de ambiente da Vercel ou selecione outro modelo.`,
+      }),
+      { status: 500 }
+    );
+  }
+
   let usedProviderId: ProviderId = candidates[0];
   let lastErrorMsg = "";
 
