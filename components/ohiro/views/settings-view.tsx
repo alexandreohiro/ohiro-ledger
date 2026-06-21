@@ -92,7 +92,7 @@ export function SettingsView({ onResetData, initialNotificationDays = 3, initial
         <div className="flex items-center gap-3 mb-4">
           <Shield className="size-5 text-[hsl(var(--accent))]" />
           <span className="text-sm font-mono font-semibold text-foreground">
-            Ohiro Ledger
+            Ohiro
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs font-mono">
@@ -191,15 +191,33 @@ export function SettingsView({ onResetData, initialNotificationDays = 3, initial
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
             Todos os dados são persistidos no Supabase com Row Level Security por usuário. Cada conta possui seus próprios dados isolados e protegidos.
           </p>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="w-fit font-mono text-xs"
-            onClick={onResetData}
-          >
-            <RefreshCw className="size-3.5" data-icon="inline-start" />
-            Apagar todos os dados
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/api/export?format=json"
+              download
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border/50 bg-card/60 hover:bg-card text-xs font-mono text-foreground transition-colors"
+            >
+              <Download className="size-3.5" />
+              Exportar JSON
+            </a>
+            <a
+              href="/api/export?format=csv"
+              download
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border/50 bg-card/60 hover:bg-card text-xs font-mono text-foreground transition-colors"
+            >
+              <Download className="size-3.5" />
+              Exportar CSV
+            </a>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="w-fit font-mono text-xs"
+              onClick={onResetData}
+            >
+              <RefreshCw className="size-3.5" data-icon="inline-start" />
+              Apagar todos os dados
+            </Button>
+          </div>
         </div>
       </div>
 

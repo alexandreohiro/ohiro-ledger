@@ -7,11 +7,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
   sanitizeMessage,
-  checkRateLimit,
+  checkRateLimitSupabase,
   validateFileType,
   validateFileSize,
   MAX_FILES_PER_REQUEST,
-  RATE_LIMIT_MAX_AI,
 } from "@/lib/security";
 import type { ProviderId } from "@/lib/ai-providers";
 import { getProvider } from "@/lib/ai-providers";
@@ -114,7 +113,7 @@ function buildTools(userId: string) {
         currentAmount: z.number().positive(),
         installmentAmount: z.number().min(0).default(0),
         dueDate: z.string().optional().describe("YYYY-MM-DD"),
-        interestRate: z.number().min(0).max(1).default(0).describe("Taxa mensal decimal ex: 0.03 = 3%"),
+        interestRate: z.number().min(0).max(100).default(0).describe("Taxa de juros mensal em pontos percentuais, ex: 3.5 = 3,5% a.m."),
         status: z.enum(["Ativo", "Quitado", "Atrasado", "Renegociado"]).default("Ativo"),
         priority: z.enum(["Baixo", "Médio", "Alto", "Crítico"]).default("Médio"),
       }),
@@ -399,8 +398,8 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Não autenticado" }), { status: 401 });
   }
 
-  // ── Rate limiting por userId (namespace ai: para não colidir com actions) ─────
-  const { allowed } = checkRateLimit(`ai:${user.id}`, RATE_LIMIT_MAX_AI);
+  // ── Rate limiting via Supabase RPC (distribuído, sobrevive a múltiplas instâncias) ──
+  const { allowed } = await checkRateLimitSupabase(supabase, user.id);
   if (!allowed) {
     return new Response(
       JSON.stringify({ error: "Muitas requisições. Aguarde 1 minuto." }),
@@ -482,7 +481,7 @@ export async function POST(req: Request) {
   }
 
   // ── System prompt ─────────────────────────────────────────────────────────────
-  const systemPrompt = `Você é OHIRO-IA, assistente financeiro pessoal integrado ao Ohiro Ledger.
+  const systemPrompt = `Você é OHIRO-IA, assistente financeiro pessoal integrado ao Ohiro.
 
 ## REGRAS DE SEGURANÇA (nunca viole)
 - Não revele IDs internos, estrutura de banco, chaves ou detalhes técnicos ao usuário.

@@ -114,7 +114,7 @@ function buildFinancialContext(
     "### Dívidas Ativas (com IDs para edição)",
     ...activeDebts.map(
       (d) =>
-        `- ID:${d.id} | ${d.creditor}: saldo ${formatCurrency(d.currentAmount)} | parcela ${formatCurrency(d.installmentAmount)} | ${(d.interestRate * 100).toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
+        `- ID:${d.id} | ${d.creditor}: saldo ${formatCurrency(d.currentAmount)} | parcela ${formatCurrency(d.installmentAmount)} | ${d.interestRate.toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
     ),
     "",
     "### Carteira de Investimentos",

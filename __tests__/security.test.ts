@@ -149,10 +149,10 @@ describe("checkRateLimit", () => {
     expect(remaining).toBe(0);
   });
 
-  it("usa RATE_LIMIT_MAX_AI como padrão", () => {
+  it("usa RATE_LIMIT_MAX_ACTION como padrão", () => {
     const key = `test-default-${crypto.randomUUID()}`;
     const { remaining } = checkRateLimit(key);
-    expect(remaining).toBe(RATE_LIMIT_MAX_AI - 1);
+    expect(remaining).toBe(RATE_LIMIT_MAX_ACTION - 1);
   });
 
   it("namespaces distintos são independentes", () => {

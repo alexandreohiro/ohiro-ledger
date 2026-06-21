@@ -3,9 +3,9 @@ import { Shield, ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — Ohiro Ledger",
+  title: "Política de Privacidade — Ohiro",
   description:
-    "Como o Ohiro Ledger coleta, usa e protege seus dados financeiros pessoais, em conformidade com a LGPD.",
+    "Como o Ohiro coleta, usa e protege seus dados financeiros pessoais, em conformidade com a LGPD.",
 };
 
 export default function PrivacidadePage() {
@@ -31,14 +31,14 @@ export default function PrivacidadePage() {
           </h1>
         </div>
         <p className="text-xs font-mono text-muted-foreground mb-10">
-          Ohiro Ledger · Última atualização: junho de 2025
+          Ohiro · Última atualização: junho de 2026
         </p>
 
         <div className="flex flex-col gap-8 text-sm font-mono leading-relaxed text-foreground/80">
 
           <Section title="1. Quem somos">
             <p>
-              O Ohiro Ledger é um aplicativo de gestão financeira pessoal desenvolvido e operado por Alexandre Ohiro
+              O Ohiro é um aplicativo de gestão financeira pessoal desenvolvido e operado por Alexandre Ohiro
               (&quot;nós&quot;, &quot;nosso&quot;). Encarregado de Dados (DPO):{" "}
               <a href="mailto:privacidade@ohiroledger.com" className="text-primary underline underline-offset-2">
                 privacidade@ohiroledger.com
