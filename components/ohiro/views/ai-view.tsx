@@ -161,11 +161,18 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   const [inputValue, setInputValue] = useState("");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  // Guarda os arquivos enviados por ID da mensagem para exibi-los na bolha
+  const [sentFilesMap, setSentFilesMap] = useState<Record<string, AttachedFile[]>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
   const financialContext = buildFinancialContext(transactions, investments, debts);
+
+  // Ref para capturar os arquivos pendentes no momento do envio
+  const pendingFilesRef = useRef<AttachedFile[]>([]);
+  // Ref com arquivos aguardando ser associados à próxima mensagem do usuário
+  const nextMsgFilesRef = useRef<AttachedFile[]>([]);
 
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -177,7 +184,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           id,
           messages: msgs,
           context: financialContext,
-          files: attachedFiles.map((f) => ({
+          // Usa a ref para capturar exatamente o que estava anexado no envio
+          files: pendingFilesRef.current.map((f) => ({
             name: f.name,
             type: f.type,
             data: f.base64,
@@ -214,10 +222,23 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
     const hasTool = lastMsg.parts?.some(
-      (p: { type: string }) =>
-        p.type === "tool-invocation"
+      (p: { type: string }) => p.type === "tool-invocation"
     );
     if (hasTool) setNeedsRefresh(true);
+  }, [messages]);
+
+  // Quando uma nova mensagem do usuário aparecer e houver arquivos pendentes, associa
+  useEffect(() => {
+    if (nextMsgFilesRef.current.length === 0) return;
+    const userMsgs = messages.filter((m) => m.role === "user");
+    if (userMsgs.length === 0) return;
+    const lastUser = userMsgs[userMsgs.length - 1];
+    setSentFilesMap((prev) => {
+      if (prev[lastUser.id]) return prev; // já associado
+      const files = nextMsgFilesRef.current;
+      nextMsgFilesRef.current = [];
+      return { ...prev, [lastUser.id]: files };
+    });
   }, [messages]);
 
   // ── File handling ─────────────────────────────────────────────────────────
@@ -300,8 +321,17 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   function handleSend() {
     const text = inputValue.trim();
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
-    const msgText = text || (attachedFiles.length > 0 ? "Analise os arquivos enviados e extraia as informações financeiras relevantes." : "");
+    const msgText = text || "Analise os arquivos enviados e extraia as informações financeiras relevantes.";
+
+    // Captura os arquivos em duas refs: uma para o body da request, outra para a UI
+    const snapshot = [...attachedFiles];
+    pendingFilesRef.current = snapshot;
+    if (snapshot.length > 0) {
+      nextMsgFilesRef.current = snapshot; // será associado via useEffect quando a msg aparecer
+    }
+
     sendMessage({ text: msgText });
+
     setInputValue("");
     setAttachedFiles([]);
     setFileError(null);
@@ -434,6 +464,29 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                   {toolParts.map((tp, i) => (
                     <ToolCard key={i} part={tp} />
                   ))}
+
+                  {/* Arquivos anexados (apenas mensagens do usuário) */}
+                  {isUser && sentFilesMap[msg.id]?.length > 0 && (
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      {sentFilesMap[msg.id].map((f) => (
+                        <div
+                          key={f.id}
+                          className="flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 rounded-lg border border-border/40 bg-muted/20 text-[10px] font-mono text-muted-foreground max-w-[180px]"
+                        >
+                          {f.preview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={f.preview} alt={f.name} className="size-8 rounded object-cover shrink-0" />
+                          ) : f.type === "application/pdf" ? (
+                            <FileText className="size-4 text-destructive/70 shrink-0" />
+                          ) : (
+                            <FileText className="size-4 text-muted-foreground/60 shrink-0" />
+                          )}
+                          <span className="truncate">{f.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Text bubble */}
                   {text && (
                     <div

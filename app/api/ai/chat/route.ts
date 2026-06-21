@@ -411,25 +411,29 @@ export async function POST(req: Request) {
   const uiMessages = (messages ?? []) as UIMessage[];
   const modelMessages = await convertToModelMessages(uiMessages);
 
-  // Se há arquivos, substitui a última mensagem do usuário adicionando fileParts
+  // Se há arquivos, injeta na última mensagem do usuário como fileParts
+  // @ai-sdk/google aceita Uint8Array (binário) ou string URL — não base64 pura
   if (files.length > 0 && modelMessages.length > 0) {
     const lastIdx = modelMessages.length - 1;
     const last = modelMessages[lastIdx];
     if (last.role === "user") {
-      const textContent = typeof last.content === "string" ? last.content : "";
       const textParts = typeof last.content === "string"
         ? [{ type: "text" as const, text: last.content }]
         : Array.isArray(last.content) ? last.content : [];
-      const fileParts = files.map((f) => ({
-        type: "file" as const,
-        mediaType: f.type as `${string}/${string}`,
-        data: f.data,
-      }));
+
+      const fileParts = files.map((f) => {
+        // Converte base64 → Uint8Array para o Gemini processar corretamente
+        const binaryStr = Buffer.from(f.data, "base64");
+        return {
+          type: "file" as const,
+          mediaType: f.type as `${string}/${string}`,
+          data: binaryStr,
+        };
+      });
+
       modelMessages[lastIdx] = {
         role: "user",
-        content: textContent
-          ? [...textParts, ...fileParts]
-          : fileParts,
+        content: [...textParts, ...fileParts],
       };
     }
   }
