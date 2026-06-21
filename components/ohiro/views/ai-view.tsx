@@ -33,8 +33,20 @@ import {
   Database,
   PlusCircle,
   ShieldCheck,
+  ChevronRight,
+  Cpu,
+  Activity,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AI_PROVIDERS,
+  type ProviderId,
+  type AIProviderDef,
+  DEFAULT_PROVIDER_ID,
+  getTodayUsage,
+  recordUsage,
+} from "@/lib/ai-providers";
 
 // ── Tipos de arquivo aceitos ──────────────────────────────────────────────────
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv";
@@ -69,27 +81,40 @@ function buildFinancialContext(
     .slice(0, 5);
   const activeDebts = debts.filter((d) => d.status === "Ativo" || d.status === "Atrasado");
 
+  // Agrupa gastos por categoria
+  const byCategory: Record<string, number> = {};
+  transactions
+    .filter((t) => t.type === "Gasto")
+    .forEach((t) => { byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount; });
+  const topCategories = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
   return [
-    "### Resumo Financeiro",
-    `- Receitas: ${formatCurrency(summary.totalRevenue)}`,
-    `- Gastos: ${formatCurrency(summary.totalExpenses)}`,
+    "### Resumo Financeiro Atual",
+    `- Receitas totais: ${formatCurrency(summary.totalRevenue)}`,
+    `- Gastos totais: ${formatCurrency(summary.totalExpenses)}`,
     `- Saldo livre: ${formatCurrency(summary.freeBalance)}`,
-    `- Total dívidas: ${formatCurrency(summary.totalDebts)}`,
+    `- Total dívidas ativas: ${formatCurrency(summary.totalDebts)}`,
     `- Total investimentos: ${formatCurrency(summary.totalInvestments)}`,
     `- Patrimônio líquido: ${formatCurrency(summary.totalPatrimony)}`,
-    `- Comprometimento renda: ${summary.incomeCommitment.toFixed(1)}%`,
-    `- Taxa investimento: ${summary.investmentRate.toFixed(1)}%`,
+    `- Comprometimento da renda: ${summary.incomeCommitment.toFixed(1)}%`,
+    `- Taxa de investimento: ${summary.investmentRate.toFixed(1)}%`,
     `- Nível de risco: ${summary.riskLevel}`,
+    `- Total de lançamentos: ${transactions.length}`,
     "",
-    "### Top 5 Maiores Gastos",
+    "### Gastos por Categoria (maiores)",
+    ...topCategories.map(([cat, val]) => `- ${cat}: ${formatCurrency(val)}`),
+    "",
+    "### Top 5 Maiores Gastos (com IDs para edição)",
     ...topExpenses.map(
-      (t) => `- ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date}`
+      (t) => `- ID:${t.id} | ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`
     ),
     "",
-    "### Dívidas Ativas",
+    "### Dívidas Ativas (com IDs para edição)",
     ...activeDebts.map(
       (d) =>
-        `- ${d.creditor}: ${formatCurrency(d.currentAmount)} | parcela: ${formatCurrency(d.installmentAmount)} | ${(d.interestRate * 100).toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
+        `- ID:${d.id} | ${d.creditor}: saldo ${formatCurrency(d.currentAmount)} | parcela ${formatCurrency(d.installmentAmount)} | ${d.interestRate.toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
     ),
     "",
     "### Carteira de Investimentos",
@@ -98,10 +123,10 @@ function buildFinancialContext(
         `- ${i.assetName} (${i.class}): ${formatCurrency(i.convertedAmountBRL)} | aporte: ${formatCurrency(i.monthlyContribution)}/mês`
     ),
     "",
-    "### Últimos 10 Lançamentos",
+    "### Últimos 15 Lançamentos (com IDs para edição)",
     ...transactions
-      .slice(0, 10)
-      .map((t) => `- [${t.type}] ${t.description}: ${formatCurrency(t.amount)} — ${t.date} (${t.status})`),
+      .slice(0, 15)
+      .map((t) => `- ID:${t.id} | [${t.type}] ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`),
   ].join("\n");
 }
 
@@ -109,22 +134,32 @@ const QUICK_PROMPTS = [
   {
     icon: AlertTriangle,
     label: "Análise de risco",
-    text: "Analise meu nível de risco financeiro atual e quais são os maiores pontos de atenção.",
+    text: "Leia meus dados atuais e analise meu nível de risco financeiro. Quais são os maiores pontos de atenção?",
   },
   {
     icon: TrendingUp,
     label: "Estratégia de dívidas",
-    text: "Qual a melhor estratégia para quitar minhas dívidas mais rápido e pagar menos juros?",
+    text: "Quais dívidas devo priorizar para quitar primeiro? Calcule o custo total de cada uma e sugira uma ordem de pagamento.",
   },
   {
     icon: BarChart3,
-    label: "Saúde dos investimentos",
-    text: "Como está minha carteira de investimentos? Está diversificada? O que posso melhorar?",
+    label: "Resumo do mês",
+    text: "Faça um resumo completo do mês atual: receitas, gastos por categoria, saldo livre e comparação com o que é ideal.",
   },
   {
     icon: Sparkles,
-    label: "Oportunidades de economia",
-    text: "Em quais categorias posso cortar despesas para melhorar minha saúde financeira?",
+    label: "Onde economizar",
+    text: "Analise meus gastos e aponte as 3 categorias onde estou gastando mais do que deveria, com sugestões práticas de corte.",
+  },
+  {
+    icon: Database,
+    label: "Listar lançamentos",
+    text: "Liste meus últimos 20 lançamentos com ID, data, descrição e valor para eu poder revisar.",
+  },
+  {
+    icon: PlusCircle,
+    label: "Registrar contracheque",
+    text: "Quero registrar meu contracheque. Me diga quais informações preciso fornecer ou envie a imagem diretamente.",
   },
 ];
 
@@ -138,11 +173,26 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   const [inputValue, setInputValue] = useState("");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  // Guarda os arquivos enviados por ID da mensagem para exibi-los na bolha
+  const [sentFilesMap, setSentFilesMap] = useState<Record<string, AttachedFile[]>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
+  // Provider selecionado e painel de troca
+  const [selectedProvider, setSelectedProvider] = useState<ProviderId>(DEFAULT_PROVIDER_ID);
+  const [showProviderPanel, setShowProviderPanel] = useState(false);
+  // Uso diário rastreado localmente
+  const [todayUsage, setTodayUsage] = useState(() => getTodayUsage());
+
   const financialContext = buildFinancialContext(transactions, investments, debts);
+
+  // Ref para capturar os arquivos pendentes no momento do envio
+  const pendingFilesRef = useRef<AttachedFile[]>([]);
+  // Ref com arquivos aguardando ser associados à próxima mensagem do usuário
+  const nextMsgFilesRef = useRef<AttachedFile[]>([]);
+
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
@@ -152,7 +202,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           id,
           messages: msgs,
           context: financialContext,
-          files: attachedFiles.map((f) => ({
+          provider: selectedProvider,
+          files: pendingFilesRef.current.map((f) => ({
             name: f.name,
             type: f.type,
             data: f.base64,
@@ -160,6 +211,16 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         },
       }),
     }),
+    onError: (err) => {
+      const msg = err?.message ?? String(err);
+      if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+        setApiError("Limite de requisições atingido. Aguarde alguns instantes e tente novamente.");
+      } else if (msg.includes("401") || msg.toLowerCase().includes("autenticad")) {
+        setApiError("Sessão expirada. Recarregue a página.");
+      } else {
+        setApiError("Falha na comunicação com a IA. Verifique sua conexão e tente novamente.");
+      }
+    },
   });
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -179,10 +240,23 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
     const hasTool = lastMsg.parts?.some(
-      (p: { type: string }) =>
-        p.type === "tool-invocation"
+      (p: { type: string }) => p.type === "tool-invocation"
     );
     if (hasTool) setNeedsRefresh(true);
+  }, [messages]);
+
+  // Quando uma nova mensagem do usuário aparecer e houver arquivos pendentes, associa
+  useEffect(() => {
+    if (nextMsgFilesRef.current.length === 0) return;
+    const userMsgs = messages.filter((m) => m.role === "user");
+    if (userMsgs.length === 0) return;
+    const lastUser = userMsgs[userMsgs.length - 1];
+    setSentFilesMap((prev) => {
+      if (prev[lastUser.id]) return prev; // já associado
+      const files = nextMsgFilesRef.current;
+      nextMsgFilesRef.current = [];
+      return { ...prev, [lastUser.id]: files };
+    });
   }, [messages]);
 
   // ── File handling ─────────────────────────────────────────────────────────
@@ -265,11 +339,25 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   function handleSend() {
     const text = inputValue.trim();
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
-    const msgText = text || (attachedFiles.length > 0 ? "Analise os arquivos enviados e extraia as informações financeiras relevantes." : "");
+    const msgText = text || "Analise os arquivos enviados e extraia as informações financeiras relevantes.";
+
+    // Captura os arquivos em duas refs: uma para o body da request, outra para a UI
+    const snapshot = [...attachedFiles];
+    pendingFilesRef.current = snapshot;
+    if (snapshot.length > 0) {
+      nextMsgFilesRef.current = snapshot; // será associado via useEffect quando a msg aparecer
+    }
+
     sendMessage({ text: msgText });
+
+    // Registra +1 requisição local para o provider selecionado
+    recordUsage(selectedProvider);
+    setTodayUsage(getTodayUsage());
+
     setInputValue("");
     setAttachedFiles([]);
     setFileError(null);
+    setApiError(null);
     setNeedsRefresh(false);
   }
 
@@ -320,30 +408,47 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-card/30 backdrop-blur-sm shrink-0">
-        <div className="flex items-center justify-center size-8 rounded-md bg-primary/10 border border-primary/20">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card/30 backdrop-blur-sm shrink-0">
+        <div className="flex items-center justify-center size-8 rounded-md bg-primary/10 border border-primary/20 shrink-0">
           <Bot className="size-4 text-primary" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-sm font-bold font-mono text-foreground tracking-wide">OHIRO-IA</h1>
-          <p className="text-[11px] font-mono text-muted-foreground tracking-widest">
+          <p className="text-[10px] font-mono text-muted-foreground tracking-widest truncate">
             ASSISTENTE FINANCEIRO · MULTIMODAL
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          {/* Refresh hint quando IA inseriu dados */}
+
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {needsRefresh && (
             <button
               onClick={() => window.location.reload()}
               className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors animate-pulse"
             >
               <RefreshCw className="size-3" />
-              Recarregar dados
+              Recarregar
             </button>
           )}
+
+          {/* Botão seletor de provider */}
+          <button
+            onClick={() => setShowProviderPanel((v) => !v)}
+            className={cn(
+              "flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-md border transition-all",
+              showProviderPanel
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
+            )}
+            aria-label="Selecionar modelo de IA"
+          >
+            <Cpu className="size-3 shrink-0" />
+            <span className="hidden sm:inline">{AI_PROVIDERS.find((p) => p.id === selectedProvider)?.modelLabel}</span>
+            <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
+          </button>
+
           <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border border-border/40">
             <ShieldCheck className="size-3 text-muted-foreground/60" />
-            <span className="text-muted-foreground/60">Dados criptografados</span>
+            <span className="text-muted-foreground/60 hidden sm:inline">Criptografado</span>
           </div>
           <div
             className={cn(
@@ -354,10 +459,24 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             )}
           >
             <div className={cn("size-1.5 rounded-full", isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/40")} />
-            {isStreaming ? "PROCESSANDO" : "AGUARDANDO"}
+            <span className="hidden sm:inline">{isStreaming ? "PROCESSANDO" : "AGUARDANDO"}</span>
           </div>
         </div>
       </div>
+
+      {/* Painel de seleção de provider */}
+      {showProviderPanel && (
+        <ProviderPanel
+          providers={AI_PROVIDERS}
+          selected={selectedProvider}
+          todayUsage={todayUsage}
+          onSelect={(id) => {
+            setSelectedProvider(id);
+            setShowProviderPanel(false);
+          }}
+          onClose={() => setShowProviderPanel(false)}
+        />
+      )}
 
       {/* Messages */}
       <div
@@ -398,6 +517,29 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                   {toolParts.map((tp, i) => (
                     <ToolCard key={i} part={tp} />
                   ))}
+
+                  {/* Arquivos anexados (apenas mensagens do usuário) */}
+                  {isUser && sentFilesMap[msg.id]?.length > 0 && (
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      {sentFilesMap[msg.id].map((f) => (
+                        <div
+                          key={f.id}
+                          className="flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 rounded-lg border border-border/40 bg-muted/20 text-[10px] font-mono text-muted-foreground max-w-[180px]"
+                        >
+                          {f.preview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={f.preview} alt={f.name} className="size-8 rounded object-cover shrink-0" />
+                          ) : f.type === "application/pdf" ? (
+                            <FileText className="size-4 text-destructive/70 shrink-0" />
+                          ) : (
+                            <FileText className="size-4 text-muted-foreground/60 shrink-0" />
+                          )}
+                          <span className="truncate">{f.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Text bubble */}
                   {text && (
                     <div
@@ -415,6 +557,21 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               </div>
             );
           })
+        )}
+
+        {/* API error banner */}
+        {apiError && (
+          <div className="flex items-start gap-3 max-w-3xl">
+            <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-destructive/10 border-destructive/25">
+              <AlertTriangle className="size-3.5 text-destructive" />
+            </div>
+            <div className="flex items-center justify-between gap-3 flex-1 rounded-xl px-4 py-3 bg-destructive/5 border border-destructive/20 text-xs font-mono text-destructive">
+              <span>{apiError}</span>
+              <button onClick={() => setApiError(null)} aria-label="Fechar erro" className="shrink-0 hover:opacity-70 transition-opacity">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Streaming dots */}
@@ -562,10 +719,152 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           </Button>
         </div>
 
-        <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
-          Gemini 2.0 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
-        </p>
+        {(() => {
+          const prov = AI_PROVIDERS.find((p) => p.id === selectedProvider)!;
+          const usage = todayUsage.requests[selectedProvider] ?? 0;
+          const limit = prov.freeDailyRequests;
+          return (
+            <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
+              {prov.label} · {prov.modelLabel}
+              {limit != null && (
+                <> · <span className={cn(usage / limit > 0.8 ? "text-destructive/50" : "")}>
+                  {usage}/{limit} req hoje
+                </span></>
+              )}
+              {!limit && <> · pago por token</>}
+              {" · "}Arraste arquivos para a tela
+            </p>
+          );
+        })()}
       </div>
+    </div>
+  );
+}
+
+// ── Provider Panel ────────────────────────────────────────────────────────────
+interface ProviderPanelProps {
+  providers: AIProviderDef[];
+  selected: ProviderId;
+  todayUsage: ReturnType<typeof getTodayUsage>;
+  onSelect: (id: ProviderId) => void;
+  onClose: () => void;
+}
+
+function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: ProviderPanelProps) {
+  return (
+    <div className="shrink-0 border-b border-border/40 bg-card/50 backdrop-blur-sm px-4 py-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Cpu className="size-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-mono font-semibold text-foreground tracking-wide">
+            MODELO DE IA
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground/60 hover:text-foreground transition-colors"
+          aria-label="Fechar painel"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {providers.map((prov) => {
+          const isSelected = prov.id === selected;
+          const usage = todayUsage.requests[prov.id] ?? 0;
+          const limit = prov.freeDailyRequests;
+          const usagePct = limit ? Math.min(usage / limit, 1) : 0;
+          const isNearLimit = limit != null && usagePct > 0.8;
+          const isAtLimit = limit != null && usage >= limit;
+
+          return (
+            <button
+              key={prov.id}
+              onClick={() => !isAtLimit && onSelect(prov.id)}
+              disabled={isAtLimit}
+              className={cn(
+                "flex flex-col gap-2 p-3 rounded-lg border text-left transition-all",
+                isSelected
+                  ? "border-primary/50 bg-primary/8"
+                  : isAtLimit
+                  ? "border-border/30 bg-muted/10 opacity-50 cursor-not-allowed"
+                  : "border-border/40 bg-card/40 hover:border-border/80 hover:bg-card/70"
+              )}
+              aria-pressed={isSelected}
+            >
+              {/* Linha 1: nome + badge selecionado */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Dot colorido do provider */}
+                  <span
+                    className="size-2 rounded-full shrink-0"
+                    style={{ backgroundColor: prov.color }}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-mono font-semibold text-foreground truncate">
+                      {prov.modelLabel}
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground/70 truncate">
+                      {prov.label}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {prov.supportsFiles && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground/60">
+                      arquivos
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary">
+                      ativo
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Linha 2: barra de uso (só para providers com free tier) */}
+              {limit != null ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[9px] font-mono">
+                    <span className="text-muted-foreground/60">Uso hoje</span>
+                    <span className={cn(isNearLimit ? "text-destructive/70" : "text-muted-foreground/60")}>
+                      {usage} / {limit} req
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full bg-muted/30 overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        isAtLimit
+                          ? "bg-destructive/60"
+                          : isNearLimit
+                          ? "bg-amber-500/60"
+                          : "bg-primary/50"
+                      )}
+                      style={{ width: `${usagePct * 100}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
+                    {isAtLimit ? "Limite atingido — use outro modelo" : prov.freeInfo}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground/50">
+                  <Info className="size-2.5 shrink-0" />
+                  {prov.freeInfo}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Nota sobre chaves de API */}
+      <p className="text-[9px] font-mono text-muted-foreground/40 mt-3 text-center">
+        Cada modelo requer uma chave de API própria configurada em Vars · O uso exibido é estimado localmente
+      </p>
     </div>
   );
 }
@@ -573,10 +872,14 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 // ── Tool card — exibe status de execução de tools ─────────────────────────────
 function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
   const toolLabels: Record<string, { label: string; icon: React.ElementType }> = {
-    addTransaction: { label: "Registrando lançamento", icon: PlusCircle },
-    upsertDebt: { label: "Registrando dívida", icon: PlusCircle },
-    upsertInvestment: { label: "Registrando investimento", icon: PlusCircle },
-    readFinancialData: { label: "Lendo dados financeiros", icon: Database },
+    addTransaction:       { label: "Registrando lançamento",      icon: PlusCircle },
+    upsertDebt:           { label: "Registrando dívida",           icon: PlusCircle },
+    upsertInvestment:     { label: "Registrando investimento",     icon: PlusCircle },
+    readFinancialData:    { label: "Lendo dados financeiros",      icon: Database },
+    searchTransactions:   { label: "Buscando lançamentos",         icon: Database },
+    updateTransaction:    { label: "Atualizando lançamento",       icon: RefreshCw },
+    deleteTransaction:    { label: "Removendo lançamento",         icon: XCircle },
+    updateDebt:           { label: "Atualizando dívida",           icon: RefreshCw },
   };
 
   const info = toolLabels[part.toolName ?? ""] ?? { label: part.toolName ?? "Tool", icon: Database };

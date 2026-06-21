@@ -1,20 +1,62 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGroq } from "@ai-sdk/groq";
+import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage, type LanguageModel } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
   sanitizeMessage,
-  checkRateLimit,
+  checkRateLimitSupabase,
   validateFileType,
   validateFileSize,
   MAX_FILES_PER_REQUEST,
 } from "@/lib/security";
+import type { ProviderId } from "@/lib/ai-providers";
+import { getProvider } from "@/lib/ai-providers";
 
 export const maxDuration = 60;
 
-const gemini = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-});
+// ── Instancia o modelo correto de acordo com o provider solicitado ─────────────
+function resolveModel(providerId: ProviderId, hasFiles: boolean): LanguageModel {
+  const def = getProvider(providerId);
+
+  // Se o provider não suporta arquivos e há arquivos, avisa ao caller
+  if (hasFiles && !def.supportsFiles) {
+    throw new Error(
+      `${def.label} (${def.modelLabel}) não suporta envio de arquivos. Use Gemini, OpenAI ou Anthropic para processar imagens e PDFs.`
+    );
+  }
+
+  switch (providerId) {
+    case "gemini": {
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error("GEMINI_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createGoogleGenerativeAI({ apiKey: key })(def.model);
+    }
+    case "openai": {
+      const key = process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("OPENAI_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createOpenAI({ apiKey: key })(def.model);
+    }
+    case "anthropic": {
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new Error("ANTHROPIC_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createAnthropic({ apiKey: key })(def.model);
+    }
+    case "groq": {
+      const key = process.env.GROQ_API_KEY;
+      if (!key) throw new Error("GROQ_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createGroq({ apiKey: key })(def.model);
+    }
+    default: {
+      // Fallback seguro para Gemini
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error("GEMINI_API_KEY não configurada.");
+      return createGoogleGenerativeAI({ apiKey: key })("gemini-2.5-flash");
+    }
+  }
+}
 
 // ── Tools de mutação de dados (scoped por userId) ─────────────────────────────
 function buildTools(userId: string) {
@@ -71,7 +113,7 @@ function buildTools(userId: string) {
         currentAmount: z.number().positive(),
         installmentAmount: z.number().min(0).default(0),
         dueDate: z.string().optional().describe("YYYY-MM-DD"),
-        interestRate: z.number().min(0).max(1).default(0).describe("Taxa mensal decimal ex: 0.03 = 3%"),
+        interestRate: z.number().min(0).max(100).default(0).describe("Taxa de juros mensal em pontos percentuais, ex: 3.5 = 3,5% a.m."),
         status: z.enum(["Ativo", "Quitado", "Atrasado", "Renegociado"]).default("Ativo"),
         priority: z.enum(["Baixo", "Médio", "Alto", "Crítico"]).default("Médio"),
       }),
@@ -132,15 +174,26 @@ function buildTools(userId: string) {
 
     readFinancialData: tool({
       description:
-        "Lê os dados financeiros atualizados do banco. Use antes de fazer análises ou quando precisar de dados mais recentes que o contexto fornecido.",
+        "Lê todos os dados financeiros atualizados (transações recentes, investimentos, dívidas). Use sempre antes de análises detalhadas ou quando o contexto parecer desatualizado.",
       inputSchema: z.object({ reason: z.string().optional() }),
       execute: async () => {
         try {
           const supabase = await createClient();
           const [txRes, invRes, debtRes] = await Promise.all([
-            supabase.from("transactions").select("type,amount,status,category,date,description").eq("user_id", userId).order("date", { ascending: false }).limit(20),
-            supabase.from("investments").select("asset_name,class,converted_amount_brl,monthly_contribution").eq("user_id", userId),
-            supabase.from("debts").select("creditor,current_amount,installment_amount,status,priority,due_date,interest_rate").eq("user_id", userId),
+            supabase
+              .from("transactions")
+              .select("id,type,amount,status,category,subcategory,date,description,account,currency,recurrence,due_date")
+              .eq("user_id", userId)
+              .order("date", { ascending: false })
+              .limit(50),
+            supabase
+              .from("investments")
+              .select("id,asset_name,class,amount,currency,converted_amount_brl,monthly_contribution")
+              .eq("user_id", userId),
+            supabase
+              .from("debts")
+              .select("id,creditor,original_amount,current_amount,installment_amount,status,priority,due_date,interest_rate")
+              .eq("user_id", userId),
           ]);
           return {
             transactions: txRes.data ?? [],
@@ -149,6 +202,188 @@ function buildTools(userId: string) {
           };
         } catch (e) {
           return { error: String(e) };
+        }
+      },
+    }),
+
+    searchTransactions: tool({
+      description:
+        "Busca lançamentos por descrição, categoria, tipo ou período. Retorna IDs reais que podem ser usados em updateTransaction ou deleteTransaction.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Texto livre para buscar na descrição ou categoria"),
+        type: z.enum(["Receita", "Gasto", "Dívida", "Investimento", "Transferência", "Reserva"]).optional(),
+        category: z.string().optional(),
+        dateFrom: z.string().optional().describe("YYYY-MM-DD"),
+        dateTo: z.string().optional().describe("YYYY-MM-DD"),
+        limit: z.number().min(1).max(30).default(10),
+      }),
+      execute: async (input) => {
+        try {
+          const supabase = await createClient();
+          let q = supabase
+            .from("transactions")
+            .select("id,date,type,category,description,amount,status,account")
+            .eq("user_id", userId)
+            .order("date", { ascending: false })
+            .limit(input.limit);
+
+          if (input.type) q = q.eq("type", input.type);
+          if (input.category) q = q.ilike("category", `%${input.category}%`);
+          if (input.dateFrom) q = q.gte("date", input.dateFrom);
+          if (input.dateTo) q = q.lte("date", input.dateTo);
+          if (input.query) q = q.or(`description.ilike.%${input.query}%,category.ilike.%${input.query}%`);
+
+          const { data, error } = await q;
+          if (error) return { success: false, error: error.message };
+          return { success: true, count: data?.length ?? 0, transactions: data ?? [] };
+        } catch (e) {
+          return { success: false, error: String(e) };
+        }
+      },
+    }),
+
+    updateTransaction: tool({
+      description:
+        "Atualiza campos de um lançamento existente pelo ID. Use searchTransactions primeiro para obter o ID correto. Só altere os campos que o usuário pediu.",
+      inputSchema: z.object({
+        id: z.string().describe("ID do lançamento obtido via searchTransactions ou readFinancialData"),
+        date: z.string().optional(),
+        type: z.enum(["Receita", "Gasto", "Dívida", "Investimento", "Transferência", "Reserva"]).optional(),
+        category: z.string().optional(),
+        subcategory: z.string().optional(),
+        description: z.string().max(200).optional(),
+        amount: z.number().positive().optional(),
+        currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+        exchangeRate: z.number().optional(),
+        status: z.enum(["Previsto", "Pago", "Pendente", "Atrasado", "Recorrente"]).optional(),
+        dueDate: z.string().optional(),
+        recurrence: z.enum(["Mensal", "Semanal", "Anual", "Única", "Nenhuma"]).optional(),
+        account: z.string().optional(),
+      }),
+      execute: async (input) => {
+        try {
+          const supabase = await createClient();
+          // Verifica que o registro pertence ao usuário antes de atualizar
+          const { data: existing } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("id", input.id)
+            .eq("user_id", userId)
+            .single();
+
+          if (!existing) return { success: false, error: "Lançamento não encontrado ou sem permissão." };
+
+          const updates: Record<string, unknown> = {};
+          if (input.date !== undefined) updates.date = input.date;
+          if (input.type !== undefined) updates.type = input.type;
+          if (input.category !== undefined) updates.category = sanitizeMessage(input.category, 100);
+          if (input.subcategory !== undefined) updates.subcategory = sanitizeMessage(input.subcategory, 100);
+          if (input.description !== undefined) updates.description = sanitizeMessage(input.description, 200);
+          if (input.amount !== undefined) updates.amount = input.amount;
+          if (input.currency !== undefined) updates.currency = input.currency;
+          if (input.exchangeRate !== undefined) updates.exchange_rate = input.exchangeRate;
+          if (input.status !== undefined) updates.status = input.status;
+          if (input.dueDate !== undefined) updates.due_date = input.dueDate;
+          if (input.recurrence !== undefined) updates.recurrence = input.recurrence;
+          if (input.account !== undefined) updates.account = sanitizeMessage(input.account, 100);
+
+          const { error } = await supabase
+            .from("transactions")
+            .update(updates)
+            .eq("id", input.id)
+            .eq("user_id", userId);
+
+          if (error) return { success: false, error: error.message };
+          return { success: true, message: `Lançamento atualizado com sucesso.` };
+        } catch (e) {
+          return { success: false, error: String(e) };
+        }
+      },
+    }),
+
+    deleteTransaction: tool({
+      description:
+        "Remove um lançamento pelo ID. SEMPRE confirme com o usuário antes de deletar — pergunte 'Confirma a exclusão do lançamento X?' e só execute após resposta afirmativa.",
+      inputSchema: z.object({
+        id: z.string().describe("ID do lançamento a remover"),
+        description: z.string().describe("Descrição do lançamento para confirmar ao usuário"),
+        confirmed: z.boolean().describe("true somente se o usuário confirmou explicitamente a exclusão"),
+      }),
+      execute: async (input) => {
+        if (!input.confirmed) {
+          return {
+            success: false,
+            requiresConfirmation: true,
+            message: `Para confirmar a exclusão de "${input.description}", responda "sim, pode apagar".`,
+          };
+        }
+        try {
+          const supabase = await createClient();
+          const { data: existing } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("id", input.id)
+            .eq("user_id", userId)
+            .single();
+
+          if (!existing) return { success: false, error: "Lançamento não encontrado ou sem permissão." };
+
+          const { error } = await supabase
+            .from("transactions")
+            .delete()
+            .eq("id", input.id)
+            .eq("user_id", userId);
+
+          if (error) return { success: false, error: error.message };
+          return { success: true, message: `Lançamento "${input.description}" removido com sucesso.` };
+        } catch (e) {
+          return { success: false, error: String(e) };
+        }
+      },
+    }),
+
+    updateDebt: tool({
+      description:
+        "Atualiza uma dívida existente (ex: registrar pagamento de parcela, mudar status para Quitado, atualizar saldo devedor).",
+      inputSchema: z.object({
+        id: z.string().describe("ID da dívida obtido via readFinancialData"),
+        currentAmount: z.number().positive().optional(),
+        installmentAmount: z.number().min(0).optional(),
+        dueDate: z.string().optional(),
+        interestRate: z.number().min(0).max(1).optional(),
+        status: z.enum(["Ativo", "Quitado", "Atrasado", "Renegociado"]).optional(),
+        priority: z.enum(["Baixo", "Médio", "Alto", "Crítico"]).optional(),
+      }),
+      execute: async (input) => {
+        try {
+          const supabase = await createClient();
+          const { data: existing } = await supabase
+            .from("debts")
+            .select("id,creditor")
+            .eq("id", input.id)
+            .eq("user_id", userId)
+            .single();
+
+          if (!existing) return { success: false, error: "Dívida não encontrada ou sem permissão." };
+
+          const updates: Record<string, unknown> = {};
+          if (input.currentAmount !== undefined) updates.current_amount = input.currentAmount;
+          if (input.installmentAmount !== undefined) updates.installment_amount = input.installmentAmount;
+          if (input.dueDate !== undefined) updates.due_date = input.dueDate;
+          if (input.interestRate !== undefined) updates.interest_rate = input.interestRate;
+          if (input.status !== undefined) updates.status = input.status;
+          if (input.priority !== undefined) updates.priority = input.priority;
+
+          const { error } = await supabase
+            .from("debts")
+            .update(updates)
+            .eq("id", input.id)
+            .eq("user_id", userId);
+
+          if (error) return { success: false, error: error.message };
+          return { success: true, message: `Dívida com ${existing.creditor} atualizada com sucesso.` };
+        } catch (e) {
+          return { success: false, error: String(e) };
         }
       },
     }),
@@ -163,8 +398,8 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Não autenticado" }), { status: 401 });
   }
 
-  // ── Rate limiting por userId ──────────────────────────────────────────────────
-  const { allowed } = checkRateLimit(user.id);
+  // ── Rate limiting via Supabase RPC (distribuído, sobrevive a múltiplas instâncias) ──
+  const { allowed } = await checkRateLimitSupabase(supabase, user.id);
   if (!allowed) {
     return new Response(
       JSON.stringify({ error: "Muitas requisições. Aguarde 1 minuto." }),
@@ -174,9 +409,10 @@ export async function POST(req: Request) {
 
   // ── Parse seguro do body ──────────────────────────────────────────────────────
   let body: {
-    messages?: unknown[];
+    messages?: UIMessage[];
     context?: string;
     files?: Array<{ name: string; type: string; data: string }>;
+    provider?: string;
   };
   try {
     body = await req.json();
@@ -184,7 +420,10 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Payload inválido" }), { status: 400 });
   }
 
-  const { messages = [], context = "", files = [] } = body;
+  const { messages = [], context = "", files = [], provider: rawProvider = "gemini" } = body;
+  const providerId: ProviderId = (["gemini", "openai", "anthropic", "groq"].includes(rawProvider)
+    ? rawProvider
+    : "gemini") as ProviderId;
 
   // ── Validação de arquivos ─────────────────────────────────────────────────────
   if (files.length > MAX_FILES_PER_REQUEST) {
@@ -210,78 +449,133 @@ export async function POST(req: Request) {
     }
   }
 
-  // ── Monta mensagens para o modelo ─────────────────────────────────────────────
-  const rawMessages = messages as Array<{ role: string; parts?: unknown[]; content?: string }>;
+  // ── Converte UIMessage[] → ModelMessage[] via SDK (correto para AI SDK 6) ────
+  const uiMessages = (messages ?? []) as UIMessage[];
+  const modelMessages = await convertToModelMessages(uiMessages);
 
-  // Converte do formato UIMessage (parts) para ModelMessage (content)
-  const modelMessages: ModelMessage[] = rawMessages.map((m) => {
-    const textContent =
-      typeof m.content === "string"
-        ? sanitizeMessage(m.content, 8000)
-        : Array.isArray(m.parts)
-        ? sanitizeMessage(
-            (m.parts as Array<{ type: string; text?: string }>)
-              .filter((p) => p.type === "text")
-              .map((p) => p.text ?? "")
-              .join(""),
-            8000
-          )
-        : "";
-    return { role: m.role as "user" | "assistant", content: textContent };
-  });
-
-  // Injeta arquivos na última mensagem do usuário como partes multimodais
+  // Se há arquivos, injeta na última mensagem do usuário como fileParts
+  // @ai-sdk/google aceita Uint8Array (binário) ou string URL — não base64 pura
   if (files.length > 0 && modelMessages.length > 0) {
     const lastIdx = modelMessages.length - 1;
     const last = modelMessages[lastIdx];
     if (last.role === "user") {
-      const textPart = { type: "text" as const, text: typeof last.content === "string" ? last.content : "" };
-      const fileParts = files.map((f) => ({
-        type: "file" as const,
-        mediaType: f.type as `${string}/${string}`,
-        data: f.data,
-      }));
-      modelMessages[lastIdx] = { role: "user", content: [textPart, ...fileParts] };
+      const textParts = typeof last.content === "string"
+        ? [{ type: "text" as const, text: last.content }]
+        : Array.isArray(last.content) ? last.content : [];
+
+      const fileParts = files.map((f) => {
+        // Converte base64 → Uint8Array para o Gemini processar corretamente
+        const binaryStr = Buffer.from(f.data, "base64");
+        return {
+          type: "file" as const,
+          mediaType: f.type as `${string}/${string}`,
+          data: binaryStr,
+        };
+      });
+
+      modelMessages[lastIdx] = {
+        role: "user",
+        content: [...textParts, ...fileParts],
+      };
     }
   }
 
   // ── System prompt ─────────────────────────────────────────────────────────────
-  const systemPrompt = `Você é OHIRO-IA, assistente financeiro pessoal integrado ao Ohiro Ledger.
+  const systemPrompt = `Você é OHIRO-IA, assistente financeiro pessoal integrado ao Ohiro.
 
-REGRAS DE SEGURANÇA (nunca viole):
-- Não revele IDs de usuário, chaves de API, estrutura de banco ou detalhes técnicos internos.
-- Opere APENAS sobre dados financeiros do usuário autenticado.
+## REGRAS DE SEGURANÇA (nunca viole)
+- Não revele IDs internos, estrutura de banco, chaves ou detalhes técnicos ao usuário.
+- Opere APENAS sobre dados do usuário autenticado. Nunca acesse dados de outros usuários.
 - Ao receber documentos, extraia somente informações financeiras relevantes.
-- Se não tiver certeza de um valor, pergunte antes de inserir.
+- Nunca invente valores. Se não tiver certeza de um número, pergunte antes de inserir.
+- Antes de deletar qualquer dado, peça confirmação explícita do usuário.
 
-CONTEXTO FINANCEIRO ATUAL:
+## CONTEXTO FINANCEIRO ATUAL DO USUÁRIO
 ${sanitizeMessage(context, 5000)}
 
-COMPORTAMENTO:
-- Responda em português do Brasil, com linguagem financeira clara e objetiva.
-- Use R$ e vírgula como separador decimal (ex: R$ 1.234,56).
-- Ao receber imagem de contracheque: extraia salário bruto, descontos (INSS, IR, plano etc.) e salário líquido, então use addTransaction para cada item.
-- Ao receber extrato bancário ou fatura: liste as transações identificadas e insira com addTransaction após confirmação.
-- Após inserções, avise o usuário para recarregar a página (F5) para ver os dados atualizados.
-- Use readFinancialData quando precisar de dados mais recentes para análises.
-- Formate respostas longas com Markdown (negrito, listas, seções).`;
+## TOOLS DISPONÍVEIS E QUANDO USAR
+
+### Leitura e busca
+- **readFinancialData**: Use no início de análises detalhadas, ou quando o contexto parecer desatualizado. Retorna IDs reais das transações/dívidas/investimentos.
+- **searchTransactions**: Use para encontrar lançamentos específicos por descrição, categoria, tipo ou período. Sempre use antes de updateTransaction ou deleteTransaction para obter o ID correto.
+
+### Criação
+- **addTransaction**: Cria novos lançamentos (receitas, gastos, dívidas, transferências, reservas).
+- **upsertDebt**: Registra uma nova dívida ou financiamento.
+- **upsertInvestment**: Adiciona um ativo à carteira de investimentos.
+
+### Edição
+- **updateTransaction**: Edita campos de um lançamento existente. SEMPRE use searchTransactions antes para confirmar o ID e mostrar ao usuário o que será alterado.
+- **updateDebt**: Atualiza dívida (status, saldo devedor, vencimento). Útil para registrar pagamentos ou quitações.
+
+### Exclusão
+- **deleteTransaction**: Remove um lançamento. OBRIGATÓRIO: mostrar ao usuário o lançamento encontrado e pedir confirmação antes de setar confirmed=true.
+
+## COMPORTAMENTO
+- Responda SEMPRE em português do Brasil, linguagem financeira clara e objetiva.
+- Valores monetários: R$ com vírgula decimal (ex: R$ 1.234,56).
+- Ao receber contracheque (imagem/PDF): extraia salário bruto, todos os descontos (INSS, IR, planos) e salário líquido. Insira cada item com addTransaction após mostrar o resumo ao usuário.
+- Ao receber extrato bancário ou fatura: liste todas as transações identificadas, confirme com o usuário e depois insira com addTransaction.
+- Após qualquer mutação de dados, avise: "Os dados foram salvos. Recarregue a página (F5 ou Ctrl+R) para ver as atualizações no dashboard."
+- Quando o usuário pedir "edite", "atualize", "mude", "corrija" ou "apague" algo: use searchTransactions para localizar, mostre o que foi encontrado e peça confirmação antes de executar.
+- Formate respostas longas com Markdown (## seções, **negrito**, listas com -).
+- Para análises financeiras: use os dados do contexto e, se precisar de mais detalhes, chame readFinancialData primeiro.
+
+## CATEGORIAS DISPONÍVEIS
+Receita: Salário, 13º Salário, Férias, Benefícios, Vale Refeição, Vale Transporte, Adicionais, Hora Extra, Bônus, Freelance, Aluguel Recebido, Dividendos, Pensão Recebida, Outros
+Gasto: Alimentação, Supermercado, Restaurante, Delivery, Moradia, Aluguel, Condomínio, IPTU, Água, Luz, Gás, Internet, Telefone, Transporte, Combustível, Uber / Táxi, Estacionamento, Manutenção Veículo, Saúde, Farmácia, Plano de Saúde, Dentista, Educação, Cursos, Material Escolar, Lazer, Streaming, Assinaturas, Roupas, Beleza, Academia, Cartão de Crédito, Financiamento, Igreja, Doações, Outros
+Dívida: Cartão de Crédito, Cheque Especial, Empréstimo Pessoal, Empréstimo Consignado, Financiamento Veículo, Financiamento Imóvel, Banco, Crediário, Pensão Alimentícia, Outros
+Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Ações, FIIs, ETF, Conta Global, Cripto, Previdência Privada, Reserva de Emergência, Poupança, Outros`;
 
   // ── Streaming ─────────────────────────────────────────────────────────────────
   try {
+    const model = resolveModel(providerId, files.length > 0);
+    const providerDef = getProvider(providerId);
+
     const result = streamText({
-      model: gemini("gemini-2.0-flash"),
+      model,
       system: systemPrompt,
       messages: modelMessages,
-      tools: buildTools(user.id),
-      stopWhen: stepCountIs(12),
+      // Groq não suporta tool calling em todos os modelos — desativa tools para evitar erro
+      tools: providerId !== "groq" ? buildTools(user.id) : undefined,
+      stopWhen: providerId !== "groq" ? stepCountIs(12) : undefined,
       temperature: 0.3,
+      onError: (err) => {
+        console.error(`[ai/chat][${providerDef.modelLabel}] stream error:`, err);
+      },
     });
 
-    return result.toUIMessageStreamResponse();
-  } catch (err) {
-    console.error("[v0] AI chat error:", err);
+    return result.toUIMessageStreamResponse({
+      headers: {
+        // Devolve o provider usado para o cliente rastrear uso
+        "X-AI-Provider": providerId,
+        "X-AI-Model": providerDef.modelLabel,
+      },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[ai/chat][${providerId}] fatal error:`, msg);
+
+    if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate limit")) {
+      return new Response(
+        JSON.stringify({ error: `Limite de requisições atingido (${getProvider(providerId).label}). Tente novamente em instantes ou troque de modelo.` }),
+        { status: 429 }
+      );
+    }
+    if (msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("_api_key")) {
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 500 }
+      );
+    }
+    if (msg.toLowerCase().includes("não suporta")) {
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 400 }
+      );
+    }
     return new Response(
-      JSON.stringify({ error: "Erro ao processar. Tente novamente." }),
+      JSON.stringify({ error: `Erro ao processar: ${msg}` }),
       { status: 500 }
     );
   }
