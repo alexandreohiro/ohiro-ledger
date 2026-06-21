@@ -446,20 +446,41 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           )}
 
           {/* Botão seletor de provider */}
-          <button
-            onClick={() => setShowProviderPanel((v) => !v)}
-            className={cn(
-              "flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-md border transition-all",
-              showProviderPanel
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
-            )}
-            aria-label="Selecionar modelo de IA"
-          >
-            <Cpu className="size-3 shrink-0" />
-            <span className="hidden sm:inline">{AI_PROVIDERS.find((p) => p.id === selectedProvider)?.modelLabel}</span>
-            <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
-          </button>
+          {(() => {
+            const prov = AI_PROVIDERS.find((p) => p.id === selectedProvider)!;
+            const usage = todayUsage.requests[selectedProvider] ?? 0;
+            const limit = prov.freeDailyRequests;
+            const remaining = limit != null ? Math.max(limit - usage, 0) : null;
+            const isNearLimit = limit != null && usage / limit > 0.8;
+            return (
+              <button
+                onClick={() => setShowProviderPanel((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-md border transition-all",
+                  showProviderPanel
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
+                )}
+                aria-label="Selecionar modelo de IA"
+              >
+                <Cpu className="size-3 shrink-0" />
+                <span className="hidden sm:inline">{prov.modelLabel}</span>
+                {remaining != null && (
+                  <span
+                    className={cn(
+                      "hidden sm:inline px-1.5 py-0.5 rounded border text-[9px]",
+                      isNearLimit
+                        ? "border-destructive/40 text-destructive bg-destructive/10"
+                        : "border-border/40 text-muted-foreground/70 bg-muted/20"
+                    )}
+                  >
+                    {remaining} restantes
+                  </span>
+                )}
+                <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
+              </button>
+            );
+          })()}
 
           <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border border-border/40">
             <ShieldCheck className="size-3 text-muted-foreground/60" />
@@ -497,8 +518,9 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-5"
+        className="flex-1 overflow-y-auto px-4 py-6"
       >
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-6">
         {messages.length === 0 ? (
           <WelcomeState onPrompt={handleQuickPrompt} isStreaming={isStreaming} />
         ) : (
@@ -510,48 +532,40 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
             if (!text && toolParts.length === 0) return null;
 
-            return (
-              <div key={msg.id} className={cn("flex gap-3", isUser ? "ml-auto flex-row-reverse max-w-xl" : "max-w-3xl")}>
-                <div
-                  className={cn(
-                    "flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border",
-                    isUser
-                      ? "bg-muted/40 border-border/40"
-                      : "bg-primary/10 border-primary/20"
-                  )}
-                >
-                  {isUser ? (
-                    <User className="size-3.5 text-muted-foreground" />
-                  ) : (
-                    <Bot className="size-3.5 text-primary" />
-                  )}
+            // Mensagens do usuário: bolha alinhada à direita, estilo Claude.
+            // Mensagens da IA: texto corrido sem chrome pesado, alinhado à esquerda.
+            if (isUser) {
+              return (
+                <div key={msg.id} className="flex justify-end">
+                  <div className="flex flex-col gap-2 items-end max-w-[85%]">
+                    {sentFilesMap[msg.id]?.length > 0 && (
+                      <div className="flex gap-2 flex-wrap justify-end">
+                        {sentFilesMap[msg.id].map((f) => (
+                          <FileThumbnail key={f.id} file={f} />
+                        ))}
+                      </div>
+                    )}
+                    {text && (
+                      <div className="rounded-2xl px-4 py-2.5 text-xs font-mono leading-relaxed bg-primary/10 border border-primary/20 text-foreground">
+                        <MarkdownText text={text} />
+                      </div>
+                    )}
+                  </div>
                 </div>
+              );
+            }
 
-                <div className="flex flex-col gap-2 min-w-0">
-                  {/* Tool invocations */}
+            return (
+              <div key={msg.id} className="flex gap-3">
+                <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-primary/10 border-primary/20">
+                  <Bot className="size-3.5 text-primary" />
+                </div>
+                <div className="flex flex-col gap-2 min-w-0 flex-1 pt-1">
                   {toolParts.map((tp, i) => (
                     <ToolCard key={i} part={tp} />
                   ))}
-
-                  {/* Arquivos anexados (apenas mensagens do usuário) */}
-                  {isUser && sentFilesMap[msg.id]?.length > 0 && (
-                    <div className="flex gap-2 flex-wrap justify-end">
-                      {sentFilesMap[msg.id].map((f) => (
-                        <FileThumbnail key={f.id} file={f} />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Text bubble */}
                   {text && (
-                    <div
-                      className={cn(
-                        "rounded-xl px-4 py-3 text-xs font-mono leading-relaxed border",
-                        isUser
-                          ? "bg-muted/30 border-border/30 text-foreground"
-                          : "bg-card/60 border-border/40 text-foreground"
-                      )}
-                    >
+                    <div className="text-xs font-mono leading-relaxed text-foreground">
                       <MarkdownText text={text} />
                     </div>
                   )}
@@ -563,7 +577,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
         {/* API error banner */}
         {apiError && (
-          <div className="flex items-start gap-3 max-w-3xl">
+          <div className="flex items-start gap-3">
             <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-destructive/10 border-destructive/25">
               <AlertTriangle className="size-3.5 text-destructive" />
             </div>
@@ -591,20 +605,19 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
         {/* Streaming dots */}
         {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
-          <div className="flex gap-3 max-w-3xl">
+          <div className="flex gap-3">
             <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-primary/10 border-primary/20">
               <Bot className="size-3.5 text-primary" />
             </div>
-            <div className="rounded-xl px-4 py-3 bg-card/60 border border-border/40">
-              <div className="flex gap-1 items-center">
-                <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-                <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
-                <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
-              </div>
+            <div className="flex gap-1 items-center pt-3">
+              <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+              <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+              <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
             </div>
           </div>
         )}
         <div ref={bottomRef} />
+        </div>
       </div>
 
       {/* Scroll button */}
@@ -620,6 +633,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
       {/* Input area */}
       <div className="shrink-0 border-t border-border/40 bg-card/30 backdrop-blur-sm px-4 py-3">
+      <div className="max-w-3xl mx-auto w-full">
         {/* Quick prompts strip */}
         {messages.length > 0 && (
           <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-none">
@@ -743,6 +757,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             </p>
           );
         })()}
+      </div>
       </div>
     </div>
   );
