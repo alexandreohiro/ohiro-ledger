@@ -115,6 +115,12 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground">
+          <Link href="/privacidade" className="text-primary hover:underline font-mono">
+            Política de Privacidade
+          </Link>
+        </p>
       </div>
     </div>
   )

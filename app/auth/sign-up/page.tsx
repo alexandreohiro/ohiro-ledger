@@ -141,6 +141,13 @@ export default function SignUpPage() {
             </Link>
           </p>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Ao criar uma conta, você concorda com nossa{' '}
+          <Link href="/privacidade" className="text-primary hover:underline font-mono">
+            Política de Privacidade
+          </Link>
+        </p>
       </div>
     </div>
   )
