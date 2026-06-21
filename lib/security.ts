@@ -3,6 +3,8 @@
  * Todas as funções são server-only (não exportar para client components).
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 // ── Tipos de arquivo permitidos ────────────────────────────────────────────────
 export const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -51,25 +53,26 @@ export function sanitizeMessage(text: string, maxLength = 4000): string {
     .trim();
 }
 
-// ── Rate limiting em memória (por userId) ─────────────────────────────────────
-// Em produção, usar Redis/Upstash. Esta implementação é por processo.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+// ── Rate limiting compartilhado (tabela Supabase + função atômica) ────────────
+// Substitui o antigo Map em memória, que não sobrevivia a múltiplas instâncias serverless.
+export async function checkRateLimit(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ allowed: boolean; remaining: number }> {
+  const { data, error } = await supabase
+    .rpc("check_rate_limit", {
+      p_user_id: userId,
+      p_window_ms: RATE_LIMIT_WINDOW_MS,
+      p_max: RATE_LIMIT_MAX,
+    })
+    .single();
 
-export function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = rateLimitMap.get(userId);
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  if (error || !data) {
+    // Falha aberta: erro de infraestrutura não deve bloquear o usuário legítimo.
+    return { allowed: true, remaining: RATE_LIMIT_MAX };
   }
 
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  entry.count += 1;
-  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count };
+  return data as { allowed: boolean; remaining: number };
 }
 
 // ── Extração segura de texto de partes multimodais ────────────────────────────

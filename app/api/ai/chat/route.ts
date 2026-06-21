@@ -164,7 +164,7 @@ export async function POST(req: Request) {
   }
 
   // ── Rate limiting por userId ──────────────────────────────────────────────────
-  const { allowed } = checkRateLimit(user.id);
+  const { allowed } = await checkRateLimit(supabase, user.id);
   if (!allowed) {
     return new Response(
       JSON.stringify({ error: "Muitas requisições. Aguarde 1 minuto." }),
