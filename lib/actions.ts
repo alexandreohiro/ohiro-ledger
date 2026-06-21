@@ -352,6 +352,7 @@ export async function getAiConsent(): Promise<boolean> {
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
+  // Falha aberta: schema desatualizado (coluna ausente) não deve derrubar a página /app.
+  if (error) return false
   return data?.ai_consent ?? false
 }
