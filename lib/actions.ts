@@ -8,9 +8,15 @@ import type { Transaction, Investment, Debt } from '@/lib/types'
 
 export async function getTransactions(): Promise<Transaction[]> {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
+    .eq('user_id', user.id)
     .order('date', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -112,9 +118,15 @@ export async function deleteTransaction(id: string): Promise<void> {
 
 export async function getInvestments(): Promise<Investment[]> {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
   const { data, error } = await supabase
     .from('investments')
     .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -201,9 +213,15 @@ export async function deleteInvestment(id: string): Promise<void> {
 
 export async function getDebts(): Promise<Debt[]> {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
   const { data, error } = await supabase
     .from('debts')
     .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
