@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
-import { Shield, Database, RefreshCw, Cloud, Bell, Minus, Plus, CheckCircle2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Shield, Database, RefreshCw, Cloud, Bell, Minus, Plus, CheckCircle2, Download } from "lucide-react";
 import { saveUserSettings } from "@/lib/notification-actions";
 import { toast } from "sonner";
 
@@ -139,15 +139,33 @@ export function SettingsView({ onResetData, initialNotificationDays = 3 }: Setti
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
             Todos os dados são persistidos no Supabase com Row Level Security por usuário. Cada conta possui seus próprios dados isolados e protegidos.
           </p>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="w-fit font-mono text-xs"
-            onClick={onResetData}
-          >
-            <RefreshCw className="size-3.5" data-icon="inline-start" />
-            Apagar todos os dados
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/api/export?format=json"
+              download
+              className={buttonVariants({ variant: "outline", size: "sm", className: "w-fit font-mono text-xs" })}
+            >
+              <Download className="size-3.5" data-icon="inline-start" />
+              Exportar JSON
+            </a>
+            <a
+              href="/api/export?format=csv"
+              download
+              className={buttonVariants({ variant: "outline", size: "sm", className: "w-fit font-mono text-xs" })}
+            >
+              <Download className="size-3.5" data-icon="inline-start" />
+              Exportar CSV
+            </a>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="w-fit font-mono text-xs"
+              onClick={onResetData}
+            >
+              <RefreshCw className="size-3.5" data-icon="inline-start" />
+              Apagar todos os dados
+            </Button>
+          </div>
         </div>
       </div>
 

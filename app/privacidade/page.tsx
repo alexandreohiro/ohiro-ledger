@@ -94,7 +94,7 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc pl-5 flex flex-col gap-1">
               <li>Confirmação da existência de tratamento e acesso aos seus dados.</li>
               <li>Correção de dados incompletos, inexatos ou desatualizados.</li>
-              <li>Exportação dos seus dados em formato estruturado.</li>
+              <li>Exportação dos seus dados em formato estruturado (disponível na área de Configurações do sistema).</li>
               <li>Exclusão dos seus dados e da sua conta.</li>
               <li>Revogação do consentimento, quando aplicável.</li>
             </ul>
