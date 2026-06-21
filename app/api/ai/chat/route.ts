@@ -2,7 +2,17 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGroq } from "@ai-sdk/groq";
-import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage, type LanguageModel } from "ai";
+import {
+  streamText,
+  tool,
+  stepCountIs,
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+  type UIMessageChunk,
+  type LanguageModel,
+} from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -16,6 +26,28 @@ import type { ProviderId } from "@/lib/ai-providers";
 import { getProvider } from "@/lib/ai-providers";
 
 export const maxDuration = 60;
+
+// ── Router de providers: tenta o solicitado e cai para outros configurados ───
+// Hoje só GEMINI_API_KEY/GROQ_API_KEY (gratuitos) costumam estar configuradas.
+// Ao lançar com plano pago, basta adicionar OPENAI_API_KEY/ANTHROPIC_API_KEY nas
+// env vars do projeto — elas entram automaticamente na cadeia de fallback, sem
+// precisar mudar código.
+const PROVIDER_ENV_KEYS: Record<ProviderId, string> = {
+  gemini: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+};
+
+function isProviderConfigured(id: ProviderId): boolean {
+  return Boolean(process.env[PROVIDER_ENV_KEYS[id]]);
+}
+
+function buildFallbackOrder(requested: ProviderId): ProviderId[] {
+  const order: ProviderId[] = ["gemini", "groq", "openai", "anthropic"];
+  const rest = order.filter((id) => id !== requested && isProviderConfigured(id));
+  return isProviderConfigured(requested) ? [requested, ...rest] : rest;
+}
 
 // ── Instancia o modelo correto de acordo com o provider solicitado ─────────────
 function resolveModel(providerId: ProviderId, hasFiles: boolean): LanguageModel {
@@ -527,29 +559,87 @@ Gasto: Alimentação, Supermercado, Restaurante, Delivery, Moradia, Aluguel, Con
 Dívida: Cartão de Crédito, Cheque Especial, Empréstimo Pessoal, Empréstimo Consignado, Financiamento Veículo, Financiamento Imóvel, Banco, Crediário, Pensão Alimentícia, Outros
 Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Ações, FIIs, ETF, Conta Global, Cripto, Previdência Privada, Reserva de Emergência, Poupança, Outros`;
 
-  // ── Streaming ─────────────────────────────────────────────────────────────────
-  try {
-    const model = resolveModel(providerId, files.length > 0);
-    const providerDef = getProvider(providerId);
+  // ── Streaming com router/fallback entre providers configurados ───────────────
+  // Tenta o provider escolhido; se falhar ANTES de gerar qualquer conteúdo
+  // (chave inválida, cota esgotada, erro de schema etc.), tenta o próximo
+  // provider configurado, na ordem de buildFallbackOrder().
+  const candidates = buildFallbackOrder(providerId);
+  if (candidates.length === 0) {
+    return new Response(
+      JSON.stringify({ error: "Nenhum provider de IA configurado. Adicione uma API key nas variáveis do projeto." }),
+      { status: 500 }
+    );
+  }
 
-    const result = streamText({
-      model,
-      system: systemPrompt,
-      messages: modelMessages,
-      // Groq não suporta tool calling em todos os modelos — desativa tools para evitar erro
-      tools: providerId !== "groq" ? buildTools(user.id) : undefined,
-      stopWhen: providerId !== "groq" ? stepCountIs(12) : undefined,
-      temperature: 0.3,
-      onError: (err) => {
-        console.error(`[ai/chat][${providerDef.modelLabel}] stream error:`, err);
+  let usedProviderId: ProviderId = candidates[0];
+  let lastErrorMsg = "";
+
+  try {
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        for (const candidateId of candidates) {
+          const providerDef = getProvider(candidateId);
+          try {
+            const model = resolveModel(candidateId, files.length > 0);
+            const result = streamText({
+              model,
+              system: systemPrompt,
+              messages: modelMessages,
+              // Groq não suporta tool calling em todos os modelos — desativa tools para evitar erro
+              tools: candidateId !== "groq" ? buildTools(user.id) : undefined,
+              stopWhen: candidateId !== "groq" ? stepCountIs(12) : undefined,
+              temperature: 0.3,
+              onError: (err) => {
+                console.error(`[ai/chat][${providerDef.modelLabel}] stream error:`, err);
+              },
+            });
+
+            const iterator: AsyncIterator<UIMessageChunk> = result
+              .toUIMessageStream()[Symbol.asyncIterator]();
+            const buffered: UIMessageChunk[] = [];
+            let failedEarly = false;
+
+            // Consome até o primeiro chunk de conteúdo real para decidir se o provider "pegou".
+            while (true) {
+              const { value, done } = await iterator.next();
+              if (done) break;
+              buffered.push(value);
+              if (value.type === "error") {
+                failedEarly = true;
+                lastErrorMsg = "error" in value ? String(value.error) : "Erro desconhecido do provider.";
+                break;
+              }
+              if (value.type !== "start" && value.type !== "start-step") break;
+            }
+
+            if (failedEarly) continue; // tenta o próximo provider da lista
+
+            usedProviderId = candidateId;
+            for (const chunk of buffered) writer.write(chunk);
+            while (true) {
+              const { value, done } = await iterator.next();
+              if (done) break;
+              writer.write(value);
+            }
+            return; // sucesso — encerra o loop de fallback
+          } catch (err) {
+            lastErrorMsg = err instanceof Error ? err.message : String(err);
+            console.error(`[ai/chat][${candidateId}] fallback error:`, lastErrorMsg);
+            continue;
+          }
+        }
+
+        // Todos os providers configurados falharam
+        throw new Error(lastErrorMsg || "Todos os providers de IA configurados falharam.");
       },
+      onError: (error) => (error instanceof Error ? error.message : String(error)),
     });
 
-    return result.toUIMessageStreamResponse({
+    return createUIMessageStreamResponse({
+      stream,
       headers: {
-        // Devolve o provider usado para o cliente rastrear uso
-        "X-AI-Provider": providerId,
-        "X-AI-Model": providerDef.modelLabel,
+        "X-AI-Provider": usedProviderId,
+        "X-AI-Model": getProvider(usedProviderId).modelLabel,
       },
     });
   } catch (err: unknown) {
