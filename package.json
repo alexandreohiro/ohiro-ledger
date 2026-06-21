@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "migrate": "node --env-file-if-exists=.env.development.local scripts/migrate.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.85",
