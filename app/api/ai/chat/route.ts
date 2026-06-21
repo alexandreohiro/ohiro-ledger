@@ -1,5 +1,8 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGroq } from "@ai-sdk/groq";
+import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage, type LanguageModel } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -9,15 +12,50 @@ import {
   validateFileSize,
   MAX_FILES_PER_REQUEST,
 } from "@/lib/security";
+import type { ProviderId } from "@/lib/ai-providers";
+import { getProvider } from "@/lib/ai-providers";
 
 export const maxDuration = 60;
 
-// Usa @ai-sdk/google diretamente com GEMINI_API_KEY
-function getGeminiModel() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
-  const google = createGoogleGenerativeAI({ apiKey });
-  return google("gemini-2.5-flash");
+// ── Instancia o modelo correto de acordo com o provider solicitado ─────────────
+function resolveModel(providerId: ProviderId, hasFiles: boolean): LanguageModel {
+  const def = getProvider(providerId);
+
+  // Se o provider não suporta arquivos e há arquivos, avisa ao caller
+  if (hasFiles && !def.supportsFiles) {
+    throw new Error(
+      `${def.label} (${def.modelLabel}) não suporta envio de arquivos. Use Gemini, OpenAI ou Anthropic para processar imagens e PDFs.`
+    );
+  }
+
+  switch (providerId) {
+    case "gemini": {
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error("GEMINI_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createGoogleGenerativeAI({ apiKey: key })(def.model);
+    }
+    case "openai": {
+      const key = process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("OPENAI_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createOpenAI({ apiKey: key })(def.model);
+    }
+    case "anthropic": {
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new Error("ANTHROPIC_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createAnthropic({ apiKey: key })(def.model);
+    }
+    case "groq": {
+      const key = process.env.GROQ_API_KEY;
+      if (!key) throw new Error("GROQ_API_KEY não configurada. Adicione em Vars nas configurações do projeto.");
+      return createGroq({ apiKey: key })(def.model);
+    }
+    default: {
+      // Fallback seguro para Gemini
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error("GEMINI_API_KEY não configurada.");
+      return createGoogleGenerativeAI({ apiKey: key })("gemini-2.5-flash");
+    }
+  }
 }
 
 // ── Tools de mutação de dados (scoped por userId) ─────────────────────────────
@@ -374,6 +412,7 @@ export async function POST(req: Request) {
     messages?: UIMessage[];
     context?: string;
     files?: Array<{ name: string; type: string; data: string }>;
+    provider?: string;
   };
   try {
     body = await req.json();
@@ -381,7 +420,10 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Payload inválido" }), { status: 400 });
   }
 
-  const { messages = [], context = "", files = [] } = body;
+  const { messages = [], context = "", files = [], provider: rawProvider = "gemini" } = body;
+  const providerId: ProviderId = (["gemini", "openai", "anthropic", "groq"].includes(rawProvider)
+    ? rawProvider
+    : "gemini") as ProviderId;
 
   // ── Validação de arquivos ─────────────────────────────────────────────────────
   if (files.length > MAX_FILES_PER_REQUEST) {
@@ -487,33 +529,49 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
 
   // ── Streaming ─────────────────────────────────────────────────────────────────
   try {
-    const model = getGeminiModel();
+    const model = resolveModel(providerId, files.length > 0);
+    const providerDef = getProvider(providerId);
+
     const result = streamText({
       model,
       system: systemPrompt,
       messages: modelMessages,
-      tools: buildTools(user.id),
-      stopWhen: stepCountIs(12),
+      // Groq não suporta tool calling em todos os modelos — desativa tools para evitar erro
+      tools: providerId !== "groq" ? buildTools(user.id) : undefined,
+      stopWhen: providerId !== "groq" ? stepCountIs(12) : undefined,
       temperature: 0.3,
       onError: (err) => {
-        console.error("[ai/chat] stream error:", err);
+        console.error(`[ai/chat][${providerDef.modelLabel}] stream error:`, err);
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      headers: {
+        // Devolve o provider usado para o cliente rastrear uso
+        "X-AI-Provider": providerId,
+        "X-AI-Model": providerDef.modelLabel,
+      },
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[ai/chat] fatal error:", msg);
-    if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+    console.error(`[ai/chat][${providerId}] fatal error:`, msg);
+
+    if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate limit")) {
       return new Response(
-        JSON.stringify({ error: "Limite de requisições da API atingido. Tente novamente em alguns instantes." }),
+        JSON.stringify({ error: `Limite de requisições atingido (${getProvider(providerId).label}). Tente novamente em instantes ou troque de modelo.` }),
         { status: 429 }
       );
     }
-    if (msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("gemini_api_key")) {
+    if (msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("_api_key")) {
       return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY não configurada. Adicione a chave em Vars nas configurações do projeto." }),
+        JSON.stringify({ error: msg }),
         { status: 500 }
+      );
+    }
+    if (msg.toLowerCase().includes("não suporta")) {
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 400 }
       );
     }
     return new Response(

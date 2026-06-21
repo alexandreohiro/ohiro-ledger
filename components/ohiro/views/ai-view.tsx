@@ -33,8 +33,20 @@ import {
   Database,
   PlusCircle,
   ShieldCheck,
+  ChevronRight,
+  Cpu,
+  Activity,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AI_PROVIDERS,
+  type ProviderId,
+  type AIProviderDef,
+  DEFAULT_PROVIDER_ID,
+  getTodayUsage,
+  recordUsage,
+} from "@/lib/ai-providers";
 
 // ── Tipos de arquivo aceitos ──────────────────────────────────────────────────
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv";
@@ -167,6 +179,12 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   const [fileError, setFileError] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
+  // Provider selecionado e painel de troca
+  const [selectedProvider, setSelectedProvider] = useState<ProviderId>(DEFAULT_PROVIDER_ID);
+  const [showProviderPanel, setShowProviderPanel] = useState(false);
+  // Uso diário rastreado localmente
+  const [todayUsage, setTodayUsage] = useState(() => getTodayUsage());
+
   const financialContext = buildFinancialContext(transactions, investments, debts);
 
   // Ref para capturar os arquivos pendentes no momento do envio
@@ -184,7 +202,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           id,
           messages: msgs,
           context: financialContext,
-          // Usa a ref para capturar exatamente o que estava anexado no envio
+          provider: selectedProvider,
           files: pendingFilesRef.current.map((f) => ({
             name: f.name,
             type: f.type,
@@ -332,6 +350,10 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
     sendMessage({ text: msgText });
 
+    // Registra +1 requisição local para o provider selecionado
+    recordUsage(selectedProvider);
+    setTodayUsage(getTodayUsage());
+
     setInputValue("");
     setAttachedFiles([]);
     setFileError(null);
@@ -386,30 +408,47 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-card/30 backdrop-blur-sm shrink-0">
-        <div className="flex items-center justify-center size-8 rounded-md bg-primary/10 border border-primary/20">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card/30 backdrop-blur-sm shrink-0">
+        <div className="flex items-center justify-center size-8 rounded-md bg-primary/10 border border-primary/20 shrink-0">
           <Bot className="size-4 text-primary" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-sm font-bold font-mono text-foreground tracking-wide">OHIRO-IA</h1>
-          <p className="text-[11px] font-mono text-muted-foreground tracking-widest">
+          <p className="text-[10px] font-mono text-muted-foreground tracking-widest truncate">
             ASSISTENTE FINANCEIRO · MULTIMODAL
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          {/* Refresh hint quando IA inseriu dados */}
+
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {needsRefresh && (
             <button
               onClick={() => window.location.reload()}
               className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors animate-pulse"
             >
               <RefreshCw className="size-3" />
-              Recarregar dados
+              Recarregar
             </button>
           )}
+
+          {/* Botão seletor de provider */}
+          <button
+            onClick={() => setShowProviderPanel((v) => !v)}
+            className={cn(
+              "flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-md border transition-all",
+              showProviderPanel
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
+            )}
+            aria-label="Selecionar modelo de IA"
+          >
+            <Cpu className="size-3 shrink-0" />
+            <span className="hidden sm:inline">{AI_PROVIDERS.find((p) => p.id === selectedProvider)?.modelLabel}</span>
+            <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
+          </button>
+
           <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border border-border/40">
             <ShieldCheck className="size-3 text-muted-foreground/60" />
-            <span className="text-muted-foreground/60">Dados criptografados</span>
+            <span className="text-muted-foreground/60 hidden sm:inline">Criptografado</span>
           </div>
           <div
             className={cn(
@@ -420,10 +459,24 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             )}
           >
             <div className={cn("size-1.5 rounded-full", isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/40")} />
-            {isStreaming ? "PROCESSANDO" : "AGUARDANDO"}
+            <span className="hidden sm:inline">{isStreaming ? "PROCESSANDO" : "AGUARDANDO"}</span>
           </div>
         </div>
       </div>
+
+      {/* Painel de seleção de provider */}
+      {showProviderPanel && (
+        <ProviderPanel
+          providers={AI_PROVIDERS}
+          selected={selectedProvider}
+          todayUsage={todayUsage}
+          onSelect={(id) => {
+            setSelectedProvider(id);
+            setShowProviderPanel(false);
+          }}
+          onClose={() => setShowProviderPanel(false)}
+        />
+      )}
 
       {/* Messages */}
       <div
@@ -666,10 +719,152 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           </Button>
         </div>
 
-        <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
-          Google AI · Gemini 2.5 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
-        </p>
+        {(() => {
+          const prov = AI_PROVIDERS.find((p) => p.id === selectedProvider)!;
+          const usage = todayUsage.requests[selectedProvider] ?? 0;
+          const limit = prov.freeDailyRequests;
+          return (
+            <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
+              {prov.label} · {prov.modelLabel}
+              {limit != null && (
+                <> · <span className={cn(usage / limit > 0.8 ? "text-destructive/50" : "")}>
+                  {usage}/{limit} req hoje
+                </span></>
+              )}
+              {!limit && <> · pago por token</>}
+              {" · "}Arraste arquivos para a tela
+            </p>
+          );
+        })()}
       </div>
+    </div>
+  );
+}
+
+// ── Provider Panel ────────────────────────────────────────────────────────────
+interface ProviderPanelProps {
+  providers: AIProviderDef[];
+  selected: ProviderId;
+  todayUsage: ReturnType<typeof getTodayUsage>;
+  onSelect: (id: ProviderId) => void;
+  onClose: () => void;
+}
+
+function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: ProviderPanelProps) {
+  return (
+    <div className="shrink-0 border-b border-border/40 bg-card/50 backdrop-blur-sm px-4 py-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Cpu className="size-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-mono font-semibold text-foreground tracking-wide">
+            MODELO DE IA
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground/60 hover:text-foreground transition-colors"
+          aria-label="Fechar painel"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {providers.map((prov) => {
+          const isSelected = prov.id === selected;
+          const usage = todayUsage.requests[prov.id] ?? 0;
+          const limit = prov.freeDailyRequests;
+          const usagePct = limit ? Math.min(usage / limit, 1) : 0;
+          const isNearLimit = limit != null && usagePct > 0.8;
+          const isAtLimit = limit != null && usage >= limit;
+
+          return (
+            <button
+              key={prov.id}
+              onClick={() => !isAtLimit && onSelect(prov.id)}
+              disabled={isAtLimit}
+              className={cn(
+                "flex flex-col gap-2 p-3 rounded-lg border text-left transition-all",
+                isSelected
+                  ? "border-primary/50 bg-primary/8"
+                  : isAtLimit
+                  ? "border-border/30 bg-muted/10 opacity-50 cursor-not-allowed"
+                  : "border-border/40 bg-card/40 hover:border-border/80 hover:bg-card/70"
+              )}
+              aria-pressed={isSelected}
+            >
+              {/* Linha 1: nome + badge selecionado */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Dot colorido do provider */}
+                  <span
+                    className="size-2 rounded-full shrink-0"
+                    style={{ backgroundColor: prov.color }}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-mono font-semibold text-foreground truncate">
+                      {prov.modelLabel}
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground/70 truncate">
+                      {prov.label}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {prov.supportsFiles && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground/60">
+                      arquivos
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary">
+                      ativo
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Linha 2: barra de uso (só para providers com free tier) */}
+              {limit != null ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[9px] font-mono">
+                    <span className="text-muted-foreground/60">Uso hoje</span>
+                    <span className={cn(isNearLimit ? "text-destructive/70" : "text-muted-foreground/60")}>
+                      {usage} / {limit} req
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full bg-muted/30 overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        isAtLimit
+                          ? "bg-destructive/60"
+                          : isNearLimit
+                          ? "bg-amber-500/60"
+                          : "bg-primary/50"
+                      )}
+                      style={{ width: `${usagePct * 100}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
+                    {isAtLimit ? "Limite atingido — use outro modelo" : prov.freeInfo}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground/50">
+                  <Info className="size-2.5 shrink-0" />
+                  {prov.freeInfo}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Nota sobre chaves de API */}
+      <p className="text-[9px] font-mono text-muted-foreground/40 mt-3 text-center">
+        Cada modelo requer uma chave de API própria configurada em Vars · O uso exibido é estimado localmente
+      </p>
     </div>
   );
 }
