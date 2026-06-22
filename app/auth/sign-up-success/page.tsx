@@ -20,17 +20,17 @@ export default function SignUpSuccessPage() {
           </div>
           <div>
             <h2 className="font-mono text-sm font-semibold uppercase tracking-widest text-foreground">
-              Acesso Criado
+              Access Created
             </h2>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-              Conta criada com sucesso. Verifique seu e-mail para confirmar o acesso antes de entrar no sistema.
+              Account created successfully. Check your email to confirm access before signing in to the system.
             </p>
           </div>
           <Link
             href="/auth/login"
             className="inline-flex items-center justify-center rounded-md border border-border bg-transparent px-4 py-2 text-xs font-mono uppercase tracking-widest text-foreground hover:bg-muted/40 transition-colors"
           >
-            Ir para login
+            Go to login
           </Link>
         </div>
       </div>

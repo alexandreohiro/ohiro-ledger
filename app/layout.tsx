@@ -11,8 +11,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Ohiro — Carteira Financeira Tática',
-  description: 'Controle financeiro pessoal com alma de planilha, inteligência de dashboard e visual de centro de controle financeiro.',
+  title: 'Ohiro — Tactical Financial Wallet',
+  description: 'Personal finance management with the soul of a spreadsheet, dashboard intelligence, and the look of a financial control center.',
   generator: 'v0.app',
 }
 
@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} dark bg-background`}>
+    <html lang="en-US" className={`${geistSans.variable} ${geistMono.variable} dark bg-background`}>
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
         <Toaster theme="dark" richColors position="bottom-right" />

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { DEBT_PRIORITY_LABEL } from "@/lib/i18n-labels";
 
 export interface Notification {
   id: string;
@@ -37,7 +38,7 @@ export async function getUserSettings(): Promise<UserSettings> {
 export async function saveUserSettings(settings: UserSettings): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado");
+  if (!user) throw new Error("Not authenticated");
 
   const { error } = await supabase
     .from("user_settings")
@@ -163,8 +164,8 @@ export async function syncDebtNotifications(): Promise<void> {
         toInsert.push({
           user_id: user.id,
           type: "debt_overdue",
-          title: `Dívida vencida — ${debt.creditor}`,
-          message: `A dívida com ${debt.creditor} venceu em ${due.toLocaleDateString("pt-BR")}. Valor atual: R$ ${Number(debt.current_amount).toFixed(2).replace(".", ",")}. Regularize para evitar juros adicionais.`,
+          title: `Debt overdue — ${debt.creditor}`,
+          message: `Your debt with ${debt.creditor} was due on ${due.toLocaleDateString("en-US")}. Current amount: $${Number(debt.current_amount).toFixed(2)}. Settle it to avoid additional interest.`,
           debt_id: debt.id,
           due_date: debt.due_date,
         });
@@ -181,12 +182,12 @@ export async function syncDebtNotifications(): Promise<void> {
         .maybeSingle();
 
       if (!existing) {
-        const label = diffDays === 0 ? "hoje" : diffDays === 1 ? "amanhã" : `em ${diffDays} dias`;
+        const label = diffDays === 0 ? "today" : diffDays === 1 ? "tomorrow" : `in ${diffDays} days`;
         toInsert.push({
           user_id: user.id,
           type: "debt_due",
-          title: `Dívida vence ${label} — ${debt.creditor}`,
-          message: `Parcela de R$ ${Number(debt.installment_amount).toFixed(2).replace(".", ",")} com ${debt.creditor} vence ${label} (${due.toLocaleDateString("pt-BR")}). Prioridade: ${debt.priority}.`,
+          title: `Debt due ${label} — ${debt.creditor}`,
+          message: `Installment of $${Number(debt.installment_amount).toFixed(2)} with ${debt.creditor} is due ${label} (${due.toLocaleDateString("en-US")}). Priority: ${DEBT_PRIORITY_LABEL[debt.priority as keyof typeof DEBT_PRIORITY_LABEL] ?? debt.priority}.`,
           debt_id: debt.id,
           due_date: debt.due_date,
         });

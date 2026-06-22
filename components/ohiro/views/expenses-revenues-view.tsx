@@ -13,6 +13,7 @@ import { StatusBadge } from "../risk-badge";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { translateCategory } from "@/lib/i18n-labels";
 import {
   BarChart,
   Bar,
@@ -90,17 +91,17 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
         </div>
         <div className="flex-1">
           <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-0.5">
-            {isExpenses ? "Controle de Gastos" : "Fluxo de Receitas"} — {monthLabel}
+            {isExpenses ? "Expense Tracking" : "Revenue Flow"} — {monthLabel}
           </div>
           <div className={cn("text-2xl font-mono font-bold", color)}>{formatCurrency(total)}</div>
         </div>
         <div className="flex gap-4 text-right">
           <div>
-            <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase">Total acumulado</div>
+            <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase">Total Accumulated</div>
             <div className={cn("text-sm font-mono font-bold", color)}>{formatCurrency(totalAll)}</div>
           </div>
           <div>
-            <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase">Lançamentos</div>
+            <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase">Entries</div>
             <div className="text-sm font-mono font-bold text-foreground">{filtered.length}</div>
           </div>
         </div>
@@ -110,7 +111,7 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
       {monthlyData.filter(m => m.valor > 0).length >= 2 && (
         <div className="rounded-lg border border-border/40 bg-card/60 p-4">
           <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-4">
-            Histórico — últimos {monthlyData.length} meses
+            History — last {monthlyData.length} months
           </div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={monthlyData} barCategoryGap="40%">
@@ -131,7 +132,7 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.3)" }} />
               <Bar
                 dataKey="valor"
-                name={isExpenses ? "Gastos" : "Receita"}
+                name={isExpenses ? "Expenses" : "Revenue"}
                 fill={barColor}
                 radius={[3, 3, 0, 0]}
               />
@@ -155,12 +156,12 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
               return (
                 <div key={cat} className="rounded-lg border border-border/40 bg-card/60 p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono font-semibold text-foreground truncate mr-2">{cat}</span>
+                    <span className="text-xs font-mono font-semibold text-foreground truncate mr-2">{translateCategory(cat)}</span>
                     <span className="text-[10px] font-mono text-muted-foreground shrink-0">{txns.length}x</span>
                   </div>
                   <div className={cn("text-lg font-mono font-bold mb-2", color)}>{formatCurrency(catTotal)}</div>
                   <Progress value={pct} className="h-1.5 mb-1" />
-                  <div className="text-[10px] font-mono text-muted-foreground mb-3">{pct.toFixed(1)}% do total do mês</div>
+                  <div className="text-[10px] font-mono text-muted-foreground mb-3">{pct.toFixed(1)}% of monthly total</div>
                   <div className="flex flex-col gap-1.5 border-t border-border/20 pt-2">
                     {txns
                       .sort((a, b) => getAmountInUSD(b) - getAmountInUSD(a))
@@ -185,9 +186,9 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Icon className="size-12 mb-4 opacity-20" />
           <div className="font-mono text-sm">
-            Nenhum lançamento em {monthLabel}
+            No entries in {monthLabel}
           </div>
-          <div className="text-[11px] mt-1">Adicione lançamentos no Ledger Operacional</div>
+          <div className="text-[11px] mt-1">Add entries in the Operational Ledger</div>
         </div>
       )}
     </div>

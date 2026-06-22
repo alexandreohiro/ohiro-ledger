@@ -20,7 +20,7 @@ export default function SignUpPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirm) {
-      setError('As senhas não coincidem')
+      setError('Passwords do not match')
       return
     }
     const supabase = createClient()
@@ -40,7 +40,7 @@ export default function SignUpPage() {
       if (error) throw error
       router.push('/auth/sign-up-success')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta')
+      setError(err instanceof Error ? err.message : 'Error creating account')
     } finally {
       setIsLoading(false)
     }
@@ -59,7 +59,7 @@ export default function SignUpPage() {
               Ohiro
             </h1>
             <p className="text-xs text-muted-foreground font-mono tracking-wider mt-1">
-              SISTEMA FINANCEIRO TÁTICO
+              TACTICAL FINANCIAL SYSTEM
             </p>
           </div>
         </div>
@@ -68,10 +68,10 @@ export default function SignUpPage() {
         <div className="rounded-xl border border-border bg-card p-6 flex flex-col gap-5">
           <div>
             <h2 className="font-mono text-sm font-semibold uppercase tracking-widest text-foreground">
-              Novo Acesso
+              New Access
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Crie suas credenciais de acesso ao sistema
+              Create your credentials to access the system
             </p>
           </div>
 
@@ -83,7 +83,7 @@ export default function SignUpPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="usuario@exemplo.com"
+                placeholder="user@example.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -93,7 +93,7 @@ export default function SignUpPage() {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password" className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                Senha
+                Password
               </Label>
               <Input
                 id="password"
@@ -107,7 +107,7 @@ export default function SignUpPage() {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="confirm" className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                Confirmar Senha
+                Confirm Password
               </Label>
               <Input
                 id="confirm"
@@ -130,14 +130,14 @@ export default function SignUpPage() {
               className="w-full font-mono uppercase tracking-widest text-xs"
               disabled={isLoading}
             >
-              {isLoading ? 'Criando acesso...' : 'Criar conta'}
+              {isLoading ? 'Creating account...' : 'Create account'}
             </Button>
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
-            Já tem acesso?{' '}
+            Already have access?{' '}
             <Link href="/auth/login" className="text-primary hover:underline font-mono">
-              Entrar
+              Sign In
             </Link>
           </p>
         </div>

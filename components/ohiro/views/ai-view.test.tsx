@@ -28,20 +28,20 @@ describe("FileThumbnail", () => {
   it("dispara onRemove ao clicar no botão de remover", () => {
     const onRemove = vi.fn();
     render(<FileThumbnail file={baseFile} onRemove={onRemove} />);
-    fireEvent.click(screen.getByLabelText("Remover extrato.pdf"));
+    fireEvent.click(screen.getByLabelText("Remove extrato.pdf"));
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
 
   it("não renderiza botão de remover quando onRemove não é passado", () => {
     render(<FileThumbnail file={baseFile} />);
-    expect(screen.queryByLabelText("Remover extrato.pdf")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Remove extrato.pdf")).not.toBeInTheDocument();
   });
 });
 
 describe("ToolCard", () => {
   it("mostra estado de execução em andamento com o label da tool", () => {
     render(<ToolCard part={{ type: "tool-invocation", toolName: "addTransaction" }} />);
-    expect(screen.getByText(/Registrando lançamento…/)).toBeInTheDocument();
+    expect(screen.getByText(/Logging entry…/)).toBeInTheDocument();
   });
 
   it("mostra mensagem de sucesso quando a tool termina com output-available", () => {

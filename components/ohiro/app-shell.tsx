@@ -115,7 +115,7 @@ export function AppShell({
       startTransition(() => router.refresh());
     } catch {
       setTransactions((prev) => prev.filter((t) => t.id !== tempId));
-      toast.error("Erro ao adicionar lançamento");
+      toast.error("Error adding entry");
     }
   }
 
@@ -125,7 +125,7 @@ export function AppShell({
       await updateTransaction(tx);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao atualizar lançamento");
+      toast.error("Error updating entry");
     }
   }
 
@@ -135,7 +135,7 @@ export function AppShell({
       await deleteTransaction(id);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao excluir lançamento");
+      toast.error("Error deleting entry");
     }
   }
 
@@ -148,7 +148,7 @@ export function AppShell({
       startTransition(() => router.refresh());
     } catch {
       setInvestments((prev) => prev.filter((i) => i.id !== tempId));
-      toast.error("Erro ao adicionar investimento");
+      toast.error("Error adding investment");
     }
   }
 
@@ -158,7 +158,7 @@ export function AppShell({
       await updateInvestment(inv);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao atualizar investimento");
+      toast.error("Error updating investment");
     }
   }
 
@@ -168,7 +168,7 @@ export function AppShell({
       await deleteInvestment(id);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao excluir investimento");
+      toast.error("Error deleting investment");
     }
   }
 
@@ -181,7 +181,7 @@ export function AppShell({
       startTransition(() => router.refresh());
     } catch {
       setDebts((prev) => prev.filter((d) => d.id !== tempId));
-      toast.error("Erro ao adicionar dívida");
+      toast.error("Error adding debt");
     }
   }
 
@@ -191,7 +191,7 @@ export function AppShell({
       await updateDebt(debt);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao atualizar dívida");
+      toast.error("Error updating debt");
     }
   }
 
@@ -201,7 +201,7 @@ export function AppShell({
       await deleteDebt(id);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao excluir dívida");
+      toast.error("Error deleting debt");
     }
   }
 
@@ -215,7 +215,7 @@ export function AppShell({
 
   // ── Reset (limpar todos os dados do usuário) ───────────────────────────────
   async function handleResetData() {
-    if (!confirm("Tem certeza? Todos os dados serão excluídos permanentemente.")) return;
+    if (!confirm("Are you sure? All data will be permanently deleted.")) return;
     // Limpar cada registro via actions
     await Promise.all([
       ...transactions.map((t) => deleteTransaction(t.id)),
@@ -225,7 +225,7 @@ export function AppShell({
     setTransactions([]);
     setInvestments([]);
     setDebts([]);
-    toast.success("Dados resetados");
+    toast.success("Data reset");
     startTransition(() => router.refresh());
   }
 

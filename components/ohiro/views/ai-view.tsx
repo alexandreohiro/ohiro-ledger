@@ -91,39 +91,39 @@ function buildFinancialContext(
     .slice(0, 6);
 
   return [
-    "### Resumo Financeiro Atual",
-    `- Receitas totais: ${formatCurrency(summary.totalRevenue)}`,
-    `- Gastos totais: ${formatCurrency(summary.totalExpenses)}`,
-    `- Saldo livre: ${formatCurrency(summary.freeBalance)}`,
-    `- Total dívidas ativas: ${formatCurrency(summary.totalDebts)}`,
-    `- Total investimentos: ${formatCurrency(summary.totalInvestments)}`,
-    `- Patrimônio líquido: ${formatCurrency(summary.totalPatrimony)}`,
-    `- Comprometimento da renda: ${summary.incomeCommitment.toFixed(1)}%`,
-    `- Taxa de investimento: ${summary.investmentRate.toFixed(1)}%`,
-    `- Nível de risco: ${summary.riskLevel}`,
-    `- Total de lançamentos: ${transactions.length}`,
+    "### Current Financial Summary",
+    `- Total income: ${formatCurrency(summary.totalRevenue)}`,
+    `- Total expenses: ${formatCurrency(summary.totalExpenses)}`,
+    `- Free balance: ${formatCurrency(summary.freeBalance)}`,
+    `- Total active debts: ${formatCurrency(summary.totalDebts)}`,
+    `- Total investments: ${formatCurrency(summary.totalInvestments)}`,
+    `- Net worth: ${formatCurrency(summary.totalPatrimony)}`,
+    `- Income commitment: ${summary.incomeCommitment.toFixed(1)}%`,
+    `- Investment rate: ${summary.investmentRate.toFixed(1)}%`,
+    `- Risk level: ${summary.riskLevel}`,
+    `- Total entries: ${transactions.length}`,
     "",
-    "### Gastos por Categoria (maiores)",
+    "### Top Spending Categories",
     ...topCategories.map(([cat, val]) => `- ${cat}: ${formatCurrency(val)}`),
     "",
-    "### Top 5 Maiores Gastos (com IDs para edição)",
+    "### Top 5 Largest Expenses (with IDs for editing)",
     ...topExpenses.map(
       (t) => `- ID:${t.id} | ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`
     ),
     "",
-    "### Dívidas Ativas (com IDs para edição)",
+    "### Active Debts (with IDs for editing)",
     ...activeDebts.map(
       (d) =>
-        `- ID:${d.id} | ${d.creditor}: saldo ${formatCurrency(d.currentAmount)} | parcela ${formatCurrency(d.installmentAmount)} | ${d.interestRate.toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
+        `- ID:${d.id} | ${d.creditor}: balance ${formatCurrency(d.currentAmount)} | installment ${formatCurrency(d.installmentAmount)} | ${d.interestRate.toFixed(2)}%/month | priority: ${d.priority} | due: ${d.dueDate ?? "—"}`
     ),
     "",
-    "### Carteira de Investimentos",
+    "### Investment Portfolio",
     ...investments.map(
       (i) =>
-        `- ${i.assetName} (${i.class}): ${formatCurrency(i.convertedAmountBRL)} | aporte: ${formatCurrency(i.monthlyContribution)}/mês`
+        `- ${i.assetName} (${i.class}): ${formatCurrency(i.convertedAmountBRL)} | monthly contribution: ${formatCurrency(i.monthlyContribution)}`
     ),
     "",
-    "### Últimos 15 Lançamentos (com IDs para edição)",
+    "### Last 15 Entries (with IDs for editing)",
     ...transactions
       .slice(0, 15)
       .map((t) => `- ID:${t.id} | [${t.type}] ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`),
@@ -133,33 +133,33 @@ function buildFinancialContext(
 const QUICK_PROMPTS = [
   {
     icon: AlertTriangle,
-    label: "Análise de risco",
-    text: "Leia meus dados atuais e analise meu nível de risco financeiro. Quais são os maiores pontos de atenção?",
+    label: "Risk analysis",
+    text: "Read my current data and analyze my financial risk level. What are the biggest points of concern?",
   },
   {
     icon: TrendingUp,
-    label: "Estratégia de dívidas",
-    text: "Quais dívidas devo priorizar para quitar primeiro? Calcule o custo total de cada uma e sugira uma ordem de pagamento.",
+    label: "Debt strategy",
+    text: "Which debts should I prioritize paying off first? Calculate the total cost of each and suggest a payment order.",
   },
   {
     icon: BarChart3,
-    label: "Resumo do mês",
-    text: "Faça um resumo completo do mês atual: receitas, gastos por categoria, saldo livre e comparação com o que é ideal.",
+    label: "Month summary",
+    text: "Give me a complete summary of the current month: income, expenses by category, free balance, and comparison with the ideal.",
   },
   {
     icon: Sparkles,
-    label: "Onde economizar",
-    text: "Analise meus gastos e aponte as 3 categorias onde estou gastando mais do que deveria, com sugestões práticas de corte.",
+    label: "Where to save",
+    text: "Analyze my spending and point out the 3 categories where I'm spending more than I should, with practical suggestions to cut back.",
   },
   {
     icon: Database,
-    label: "Listar lançamentos",
-    text: "Liste meus últimos 20 lançamentos com ID, data, descrição e valor para eu poder revisar.",
+    label: "List entries",
+    text: "List my last 20 entries with ID, date, description, and amount so I can review them.",
   },
   {
     icon: PlusCircle,
-    label: "Registrar contracheque",
-    text: "Quero registrar meu contracheque. Me diga quais informações preciso fornecer ou envie a imagem diretamente.",
+    label: "Log a paycheck",
+    text: "I want to log my paycheck. Tell me what information I need to provide, or send the image directly.",
   },
 ];
 
@@ -239,17 +239,17 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
       const msg = err?.message ?? String(err);
       const lower = msg.toLowerCase();
       if (lower.includes("429") || lower.includes("quota") || lower.includes("rate")) {
-        setApiError("Limite de requisições atingido. Aguarde alguns instantes ou troque de modelo.");
+        setApiError("Request limit reached. Wait a few moments or switch models.");
       } else if (msg.includes("401") || lower.includes("autenticad")) {
-        setApiError("Sessão expirada. Recarregue a página.");
+        setApiError("Session expired. Reload the page.");
       } else if (lower.includes("não suporta") || lower.includes("não configurada") || lower.includes("saldo de créditos")) {
-        // Mensagens já vêm em português e específicas do servidor (ex: provider sem
-        // suporte a arquivos, API key ausente, créditos esgotados) — mostra direto, sem genericizar.
+        // These messages already come from the server in Portuguese and are specific
+        // (e.g. provider doesn't support files, missing API key, credits exhausted) — show as-is, don't genericize.
         setApiError(msg);
       } else if (lower.includes("failed to fetch") || lower.includes("network")) {
-        setApiError("Sem conexão com o servidor. Verifique sua internet e tente novamente.");
+        setApiError("No connection to the server. Check your internet and try again.");
       } else {
-        setApiError("Falha na comunicação com a IA. Verifique sua conexão e tente novamente.");
+        setApiError("Failed to communicate with the AI. Check your connection and try again.");
       }
     },
     onFinish: () => {
@@ -299,19 +299,19 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     setFileError(null);
     const files = Array.from(fileList);
     if (attachedFiles.length + files.length > MAX_FILES) {
-      setFileError(`Máximo de ${MAX_FILES} arquivos por mensagem.`);
+      setFileError(`Maximum of ${MAX_FILES} files per message.`);
       return;
     }
 
     const newAttached: AttachedFile[] = [];
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE) {
-        setFileError(`"${file.name}" excede 10 MB.`);
+        setFileError(`"${file.name}" exceeds 10 MB.`);
         return;
       }
       const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf", "text/plain", "text/csv"];
       if (!allowedTypes.includes(file.type)) {
-        setFileError(`Tipo não suportado: ${file.name}. Use imagem, PDF, TXT ou CSV.`);
+        setFileError(`Unsupported type: ${file.name}. Use image, PDF, TXT, or CSV.`);
         return;
       }
 
@@ -374,7 +374,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   function handleSend() {
     const text = inputValue.trim();
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
-    const msgText = text || "Analise os arquivos enviados e extraia as informações financeiras relevantes.";
+    const msgText = text || "Analyze the uploaded files and extract the relevant financial information.";
 
     // Captura os arquivos em duas refs: uma para o body da request, outra para a UI
     const snapshot = [...attachedFiles];
@@ -437,8 +437,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           <div className="flex items-center justify-center size-16 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/40">
             <Paperclip className="size-7 text-primary" />
           </div>
-          <p className="text-sm font-mono font-semibold text-primary">Solte os arquivos aqui</p>
-          <p className="text-xs font-mono text-muted-foreground">Imagens, PDF, TXT, CSV — máx 10 MB cada</p>
+          <p className="text-sm font-mono font-semibold text-primary">Drop files here</p>
+          <p className="text-xs font-mono text-muted-foreground">Images, PDF, TXT, CSV — max 10 MB each</p>
         </div>
       )}
 
@@ -450,7 +450,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         <div className="min-w-0">
           <h1 className="text-sm font-bold font-mono text-foreground tracking-wide">OHIRO-IA</h1>
           <p className="text-[10px] font-mono text-muted-foreground tracking-widest truncate">
-            ASSISTENTE FINANCEIRO · MULTIMODAL
+            FINANCIAL ASSISTANT · MULTIMODAL
           </p>
         </div>
 
@@ -461,7 +461,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors animate-pulse"
             >
               <RefreshCw className="size-3" />
-              Recarregar
+              Reload
             </button>
           )}
 
@@ -483,7 +483,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                     ? "border-primary/40 bg-primary/10 text-primary"
                     : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
                 )}
-                aria-label="Selecionar modelo de IA"
+                aria-label="Select AI model"
               >
                 <Cpu className="size-3 shrink-0" />
                 <span className="hidden sm:inline">{prov.modelLabel}</span>
@@ -496,7 +496,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                         : "border-border/40 text-muted-foreground/70 bg-muted/20"
                     )}
                   >
-                    {remaining} restantes
+                    {remaining} left
                   </span>
                 )}
                 {prov.billedByCredit && balance != null && (
@@ -508,7 +508,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                         : "border-border/40 text-muted-foreground/70 bg-muted/20"
                     )}
                   >
-                    ${balance.toFixed(2)} saldo
+                    ${balance.toFixed(2)} balance
                   </span>
                 )}
                 <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
@@ -518,7 +518,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
           <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border border-border/40">
             <ShieldCheck className="size-3 text-muted-foreground/60" />
-            <span className="text-muted-foreground/60 hidden sm:inline">Criptografado</span>
+            <span className="text-muted-foreground/60 hidden sm:inline">Encrypted</span>
           </div>
           <div
             className={cn(
@@ -529,7 +529,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             )}
           >
             <div className={cn("size-1.5 rounded-full", isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/40")} />
-            <span className="hidden sm:inline">{isStreaming ? "PROCESSANDO" : "AGUARDANDO"}</span>
+            <span className="hidden sm:inline">{isStreaming ? "PROCESSING" : "WAITING"}</span>
           </div>
         </div>
       </div>
@@ -624,13 +624,13 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                     setApiError(null);
                     regenerate();
                   }}
-                  aria-label="Tentar novamente"
+                  aria-label="Try again"
                   className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md border border-destructive/30 hover:bg-destructive/10 transition-colors"
                 >
                   <RefreshCw className="size-3" />
-                  Tentar de novo
+                  Try again
                 </button>
-                <button onClick={() => setApiError(null)} aria-label="Fechar erro" className="hover:opacity-70 transition-opacity">
+                <button onClick={() => setApiError(null)} aria-label="Dismiss error" className="hover:opacity-70 transition-opacity">
                   <X className="size-3.5" />
                 </button>
               </div>
@@ -660,7 +660,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         <button
           onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
           className="absolute bottom-28 right-6 flex items-center justify-center size-8 rounded-full bg-card border border-border/60 text-muted-foreground hover:text-foreground shadow-lg transition-all z-10"
-          aria-label="Rolar para o final"
+          aria-label="Scroll to bottom"
         >
           <ChevronDown className="size-4" />
         </button>
@@ -718,12 +718,12 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             multiple
             className="sr-only"
             onChange={handleFileInput}
-            aria-label="Anexar arquivo"
+            aria-label="Attach file"
           />
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isStreaming || attachedFiles.length >= MAX_FILES}
-            aria-label="Anexar arquivo"
+            aria-label="Attach file"
             className={cn(
               "flex items-center justify-center size-10 shrink-0 rounded-lg border transition-colors",
               attachedFiles.length > 0
@@ -740,7 +740,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Pergunte, envie um contracheque, extrato ou fatura… (Enter para enviar)"
+            placeholder="Ask a question, send a paycheck, statement, or bill… (Enter to send)"
             rows={1}
             disabled={isStreaming}
             className="flex-1 resize-none min-h-[40px] max-h-[120px] rounded-lg border border-border/50 bg-background/60 px-3 py-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 disabled:opacity-50 transition-all leading-relaxed"
@@ -758,7 +758,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               variant="outline"
               onClick={() => stop()}
               className="size-10 shrink-0 p-0 border-destructive/40 text-destructive hover:bg-destructive/10"
-              aria-label="Parar resposta"
+              aria-label="Stop response"
             >
               <XCircle className="size-4" />
             </Button>
@@ -768,7 +768,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               onClick={handleSend}
               disabled={!inputValue.trim() && attachedFiles.length === 0}
               className="size-10 shrink-0 p-0"
-              aria-label="Enviar mensagem"
+              aria-label="Send message"
             >
               <Send className="size-4" />
             </Button>
@@ -785,15 +785,15 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               {prov.label} · {prov.modelLabel}
               {limit != null && (
                 <> · <span className={cn(usage / limit > 0.8 ? "text-destructive/50" : "")}>
-                  {usage}/{limit} req hoje
+                  {usage}/{limit} req today
                 </span></>
               )}
               {prov.billedByCredit && (
                 <> · <span className={cn(balance != null && balance < 1 ? "text-destructive/50" : "")}>
-                  ${balance != null ? balance.toFixed(2) : "?"} de crédito restante
+                  ${balance != null ? balance.toFixed(2) : "?"} credit remaining
                 </span></>
               )}
-              {" · "}Arraste arquivos para a tela
+              {" · "}Drag files anywhere on screen
             </p>
           );
         })()}
@@ -820,13 +820,13 @@ function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSele
         <div className="flex items-center gap-2">
           <Cpu className="size-3.5 text-muted-foreground" />
           <span className="text-[11px] font-mono font-semibold text-foreground tracking-wide">
-            MODELO DE IA
+            AI MODEL
           </span>
         </div>
         <button
           onClick={onClose}
           className="text-muted-foreground/60 hover:text-foreground transition-colors"
-          aria-label="Fechar painel"
+          aria-label="Close panel"
         >
           <X className="size-3.5" />
         </button>
@@ -879,12 +879,12 @@ function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSele
                 <div className="flex items-center gap-1.5 shrink-0">
                   {prov.supportsFiles && (
                     <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground/60">
-                      arquivos
+                      files
                     </span>
                   )}
                   {isSelected && (
                     <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary">
-                      ativo
+                      active
                     </span>
                   )}
                 </div>
@@ -894,7 +894,7 @@ function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSele
               {limit != null ? (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[9px] font-mono">
-                    <span className="text-muted-foreground/60">Uso hoje</span>
+                    <span className="text-muted-foreground/60">Usage today</span>
                     <span className={cn(isNearLimit ? "text-destructive/70" : "text-muted-foreground/60")}>
                       {usage} / {limit} req
                     </span>
@@ -913,19 +913,19 @@ function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSele
                     />
                   </div>
                   <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
-                    {isAtLimit ? "Limite atingido — use outro modelo" : prov.freeInfo}
+                    {isAtLimit ? "Limit reached — use another model" : prov.freeInfo}
                   </div>
                 </div>
               ) : prov.billedByCredit ? (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[9px] font-mono">
-                    <span className="text-muted-foreground/60">Saldo de créditos</span>
+                    <span className="text-muted-foreground/60">Credit balance</span>
                     <span className={cn(isOutOfCredit ? "text-destructive/70" : "text-muted-foreground/60")}>
                       ${balance != null ? balance.toFixed(2) : "?"}
                     </span>
                   </div>
                   <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
-                    {isOutOfCredit ? "Sem saldo — adicione créditos ou use outro modelo" : prov.freeInfo}
+                    {isOutOfCredit ? "No balance — add credits or use another model" : prov.freeInfo}
                   </div>
                 </div>
               ) : (
@@ -941,7 +941,7 @@ function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSele
 
       {/* Nota sobre chaves de API */}
       <p className="text-[9px] font-mono text-muted-foreground/40 mt-3 text-center">
-        Cada modelo requer uma chave de API própria configurada em Vars · O uso exibido é estimado localmente
+        Each model requires its own API key configured in Vars · Usage shown is estimated locally
       </p>
     </div>
   );
@@ -990,7 +990,7 @@ export function FileThumbnail({
       {onRemove && (
         <button
           onClick={onRemove}
-          aria-label={`Remover ${file.name}`}
+          aria-label={`Remove ${file.name}`}
           className="absolute -top-1.5 -right-1.5 flex items-center justify-center size-4 rounded-full bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
         >
           <X className="size-2.5" />
@@ -1003,14 +1003,14 @@ export function FileThumbnail({
 // ── Tool card — exibe status de execução de tools ─────────────────────────────
 export function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
   const toolLabels: Record<string, { label: string; icon: React.ElementType }> = {
-    addTransaction:       { label: "Registrando lançamento",      icon: PlusCircle },
-    upsertDebt:           { label: "Registrando dívida",           icon: PlusCircle },
-    upsertInvestment:     { label: "Registrando investimento",     icon: PlusCircle },
-    readFinancialData:    { label: "Lendo dados financeiros",      icon: Database },
-    searchTransactions:   { label: "Buscando lançamentos",         icon: Database },
-    updateTransaction:    { label: "Atualizando lançamento",       icon: RefreshCw },
-    deleteTransaction:    { label: "Removendo lançamento",         icon: XCircle },
-    updateDebt:           { label: "Atualizando dívida",           icon: RefreshCw },
+    addTransaction:       { label: "Logging entry",                icon: PlusCircle },
+    upsertDebt:           { label: "Logging debt",                 icon: PlusCircle },
+    upsertInvestment:     { label: "Logging investment",           icon: PlusCircle },
+    readFinancialData:    { label: "Reading financial data",       icon: Database },
+    searchTransactions:   { label: "Searching entries",            icon: Database },
+    updateTransaction:    { label: "Updating entry",                icon: RefreshCw },
+    deleteTransaction:    { label: "Removing entry",                icon: XCircle },
+    updateDebt:           { label: "Updating debt",                 icon: RefreshCw },
   };
 
   const info = toolLabels[part.toolName ?? ""] ?? { label: part.toolName ?? "Tool", icon: Database };
@@ -1065,14 +1065,14 @@ function WelcomeState({
         </div>
         <h2 className="text-base font-bold font-mono text-foreground">OHIRO-IA</h2>
         <p className="text-xs font-mono text-muted-foreground max-w-sm leading-relaxed">
-          Assistente financeiro com acesso direto ao seu ledger. Envie arquivos, fotos de
-          contracheques, extratos ou faturas — a IA extrai e registra tudo automaticamente.
+          Financial assistant with direct access to your ledger. Send files, photos of
+          paychecks, bank statements, or bills — the AI extracts and logs everything automatically.
         </p>
         <div className="flex items-center justify-center gap-4 mt-3">
           {[
-            { icon: ImageIcon, label: "Contracheques" },
-            { icon: FileText, label: "Extratos" },
-            { icon: FileText, label: "Faturas" },
+            { icon: ImageIcon, label: "Paychecks" },
+            { icon: FileText, label: "Statements" },
+            { icon: FileText, label: "Bills" },
           ].map(({ icon: Icon, label }) => (
             <div key={label} className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/60">
               <Icon className="size-3" />

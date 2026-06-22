@@ -21,13 +21,13 @@ import { useState } from "react";
 const navItems: { id: ActiveView; label: string; icon: React.ElementType; shortLabel: string }[] = [
   { id: "dashboard", label: "Dashboard", shortLabel: "DASH", icon: LayoutDashboard },
   { id: "ledger", label: "Ledger", shortLabel: "LGDR", icon: BookOpen },
-  { id: "gastos", label: "Gastos", shortLabel: "GAST", icon: TrendingDown },
-  { id: "receitas", label: "Receitas", shortLabel: "RECV", icon: TrendingUp },
-  { id: "dividas", label: "Dívidas", shortLabel: "DVDA", icon: CreditCard },
-  { id: "investimentos", label: "Investimentos", shortLabel: "INVS", icon: LineChart },
-  { id: "projecoes", label: "Projeções", shortLabel: "PROJ", icon: BarChart3 },
-  { id: "ia", label: "IA Financeira", shortLabel: "IA", icon: BrainCircuit },
-  { id: "configuracoes", label: "Configurações", shortLabel: "CONF", icon: Settings },
+  { id: "gastos", label: "Expenses", shortLabel: "GAST", icon: TrendingDown },
+  { id: "receitas", label: "Income", shortLabel: "RECV", icon: TrendingUp },
+  { id: "dividas", label: "Debts", shortLabel: "DVDA", icon: CreditCard },
+  { id: "investimentos", label: "Investments", shortLabel: "INVS", icon: LineChart },
+  { id: "projecoes", label: "Projections", shortLabel: "PROJ", icon: BarChart3 },
+  { id: "ia", label: "AI Finance", shortLabel: "IA", icon: BrainCircuit },
+  { id: "configuracoes", label: "Settings", shortLabel: "CONF", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -83,7 +83,7 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
         {/* Nav label */}
         {!collapsed && (
           <div className="px-4 pt-4 pb-1">
-            <span className="text-[10px] font-mono text-muted-foreground/50 tracking-widest uppercase">Módulos</span>
+            <span className="text-[10px] font-mono text-muted-foreground/50 tracking-widest uppercase">Modules</span>
           </div>
         )}
 
@@ -130,7 +130,7 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
             )}
           >
             <Menu className="size-4 shrink-0" />
-            {!collapsed && <span>Recolher</span>}
+            {!collapsed && <span>Collapse</span>}
           </button>
         </div>
       </aside>

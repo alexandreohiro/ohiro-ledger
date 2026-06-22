@@ -13,6 +13,7 @@ import {
 } from "@/lib/calculations";
 import { SummaryCard } from "../summary-card";
 import { RiskBadge, StatusBadge } from "../risk-badge";
+import { translateCategory } from "@/lib/i18n-labels";
 import {
   TrendingUp,
   TrendingDown,
@@ -141,7 +142,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
         <div key={p.name} className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-full" style={{ background: p.color }} />
-            <span className="text-muted-foreground capitalize">{p.name}</span>
+            <span className="text-muted-foreground capitalize">{translateCategory(p.name)}</span>
           </div>
           <span className="font-bold text-foreground">{formatCurrency(p.value)}</span>
         </div>
@@ -155,7 +156,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
   const item = payload[0];
   return (
     <div className="bg-card border border-border/60 rounded-md px-3 py-2 shadow-xl text-xs font-mono">
-      <div className="text-muted-foreground">{item.name}</div>
+      <div className="text-muted-foreground">{translateCategory(item.name)}</div>
       <div className="font-bold text-foreground">{formatCurrency(item.value)}</div>
     </div>
   );
@@ -202,11 +203,11 @@ export function DashboardView({ transactions, monthTransactions, investments, se
       {/* Header label */}
       <div className="flex items-center justify-between">
         <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">
-          Resumo Operacional — {monthLabel}
+          Operational Summary — {monthLabel}
         </div>
         {monthTransactions.length === 0 && (
           <div className="text-[11px] font-mono text-muted-foreground/60 bg-muted/30 px-3 py-1 rounded-md border border-border/30">
-            Nenhum lançamento neste mês
+            No entries this month
           </div>
         )}
       </div>
@@ -214,39 +215,39 @@ export function DashboardView({ transactions, monthTransactions, investments, se
       {/* Row 1 — KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard
-          title="Receita Total"
+          title="Total Income"
           value={formatCurrency(summary.totalRevenue)}
           icon={TrendingUp}
           variant="positive"
-          subtitle="Fluxo de entrada"
-          trendLabel="Renda bruta do mês"
+          subtitle="Incoming flow"
+          trendLabel="Gross income this month"
           trend="up"
         />
         <SummaryCard
-          title="Gastos Totais"
+          title="Total Expenses"
           value={formatCurrency(summary.totalExpenses)}
           icon={TrendingDown}
           variant="warning"
-          subtitle="Saídas confirmadas"
-          trendLabel={summary.totalRevenue > 0 ? `${formatPercent((summary.totalExpenses / summary.totalRevenue) * 100)} da renda` : "—"}
+          subtitle="Confirmed outflows"
+          trendLabel={summary.totalRevenue > 0 ? `${formatPercent((summary.totalExpenses / summary.totalRevenue) * 100)} of income` : "—"}
           trend="down"
         />
         <SummaryCard
-          title="Dívidas do Mês"
+          title="Debts This Month"
           value={formatCurrency(summary.totalDebts)}
           icon={CreditCard}
           variant="critical"
-          subtitle="Compromissos ativos"
-          trendLabel="Obrigações pendentes"
+          subtitle="Active commitments"
+          trendLabel="Pending obligations"
           trend="down"
         />
         <SummaryCard
-          title="Investimentos"
+          title="Investments"
           value={formatCurrency(summary.totalInvestments)}
           icon={LineChartIcon}
           variant="accent"
-          subtitle="Aportes do mês"
-          trendLabel={summary.totalRevenue > 0 ? `${formatPercent(summary.investmentRate)} da renda` : "—"}
+          subtitle="Contributions this month"
+          trendLabel={summary.totalRevenue > 0 ? `${formatPercent(summary.investmentRate)} of income` : "—"}
           trend="up"
         />
       </div>
@@ -254,36 +255,36 @@ export function DashboardView({ transactions, monthTransactions, investments, se
       {/* Row 2 — balance KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard
-          title="Saldo Livre"
+          title="Free Balance"
           value={formatCurrency(summary.freeBalance)}
           icon={Wallet}
           variant={balanceVariant}
-          subtitle="Saldo operacional"
-          description={summary.freeBalance >= 0 ? "Situação controlada" : "Deficit no mês"}
+          subtitle="Operational balance"
+          description={summary.freeBalance >= 0 ? "Under control" : "Deficit this month"}
         />
         <SummaryCard
-          title="Patrimônio Total"
+          title="Total Net Worth"
           value={formatCurrency(summary.totalPatrimony)}
           icon={Building2}
           variant="accent"
-          subtitle="Carteira consolidada"
-          description="Investimentos em BRL"
+          subtitle="Consolidated portfolio"
+          description="Investments in USD"
         />
         <SummaryCard
-          title="Renda Comprometida"
+          title="Committed Income"
           value={formatPercent(summary.incomeCommitment)}
           icon={AlertTriangle}
           variant={riskVariant}
-          subtitle="% gastos + dívidas"
+          subtitle="% expenses + debts"
           badge={<RiskBadge level={summary.riskLevel} size="sm" />}
         />
         <SummaryCard
-          title="Taxa de Investimento"
+          title="Investment Rate"
           value={formatPercent(summary.investmentRate)}
           icon={PieChartIcon}
           variant="accent"
-          subtitle="% da renda investida"
-          description="Proporção de poupança"
+          subtitle="% of income invested"
+          description="Savings proportion"
         />
       </div>
 
@@ -293,11 +294,11 @@ export function DashboardView({ transactions, monthTransactions, investments, se
         {/* Bar chart histórico */}
         <div className="lg:col-span-2 rounded-lg border border-border/40 bg-card/60 p-4">
           <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-4">
-            Histórico Receita vs Gastos (últimos {monthlyData.length} meses)
+            Income vs Expenses History (last {monthlyData.length} months)
           </div>
           {monthlyData.length === 0 ? (
             <div className="flex items-center justify-center h-[200px] text-muted-foreground text-xs font-mono">
-              Sem dados históricos
+              No historical data
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -322,10 +323,10 @@ export function DashboardView({ transactions, monthTransactions, investments, se
                   iconType="circle"
                   iconSize={8}
                 />
-                <Bar dataKey="receita" name="Receita" fill="hsl(var(--risk-low))" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="gastos" name="Gastos" fill="hsl(var(--risk-medium))" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="dividas" name="Dívidas" fill="hsl(var(--risk-critical))" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="investimentos" name="Investimentos" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="receita" name="Income" fill="hsl(var(--risk-low))" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="gastos" name="Expenses" fill="hsl(var(--risk-medium))" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="dividas" name="Debts" fill="hsl(var(--risk-critical))" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="investimentos" name="Investments" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -334,11 +335,11 @@ export function DashboardView({ transactions, monthTransactions, investments, se
         {/* Pie chart gastos do mês */}
         <div className="rounded-lg border border-border/40 bg-card/60 p-4">
           <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-4">
-            Distribuição de Gastos — {monthLabel}
+            Expense Distribution — {monthLabel}
           </div>
           {pieData.length === 0 ? (
             <div className="flex items-center justify-center h-[180px] text-muted-foreground text-xs font-mono">
-              Sem gastos neste mês
+              No expenses this month
             </div>
           ) : (
             <>
@@ -366,7 +367,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
                   <div key={item.name} className="flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="size-2 rounded-full shrink-0" style={{ background: item.color }} />
-                      <span className="text-muted-foreground truncate">{item.name}</span>
+                      <span className="text-muted-foreground truncate">{translateCategory(item.name)}</span>
                     </div>
                     <span className="text-foreground font-medium shrink-0 ml-2">{formatCurrency(item.value)}</span>
                   </div>
@@ -381,7 +382,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
       {monthlyData.length >= 2 && (
         <div className="rounded-lg border border-border/40 bg-card/60 p-4">
           <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-4">
-            Evolução do Saldo Livre
+            Free Balance Trend
           </div>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={monthlyData}>
@@ -409,7 +410,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
               <Area
                 type="monotone"
                 dataKey="saldo"
-                name="Saldo"
+                name="Balance"
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 fill="url(#gradSaldo)"
@@ -424,14 +425,14 @@ export function DashboardView({ transactions, monthTransactions, investments, se
       {/* Row 5 — Lançamentos recentes + Saúde financeira */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* Lançamentos recentes */}
+        {/* Recent entries */}
         <div className="lg:col-span-2 rounded-lg border border-border/40 bg-card/60 p-4">
           <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-3">
-            Lançamentos Recentes — {monthLabel}
+            Recent Entries — {monthLabel}
           </div>
           {recentTransactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-xs font-mono">
-              Nenhum lançamento neste mês
+              No entries this month
             </div>
           ) : (
             <div className="flex flex-col">
@@ -449,7 +450,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
                     }`} />
                     <div className="min-w-0">
                       <div className="text-xs font-mono text-foreground truncate">{t.description}</div>
-                      <div className="text-[10px] font-mono text-muted-foreground">{t.date} · {t.category}</div>
+                      <div className="text-[10px] font-mono text-muted-foreground">{t.date} · {translateCategory(t.category)}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -466,34 +467,34 @@ export function DashboardView({ transactions, monthTransactions, investments, se
           )}
         </div>
 
-        {/* Saúde financeira */}
+        {/* Financial health */}
         <div className="rounded-lg border border-border/40 bg-card/60 p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">
-              Saúde Financeira
+              Financial Health
             </div>
             <RiskBadge level={summary.riskLevel} size="md" />
           </div>
           <div className="flex flex-col gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <div className="text-[10px] font-mono text-muted-foreground tracking-wider">COMPROMETIMENTO</div>
+                <div className="text-[10px] font-mono text-muted-foreground tracking-wider">COMMITMENT</div>
                 <div className="text-xs font-mono font-bold text-foreground">{formatPercent(summary.incomeCommitment)}</div>
               </div>
               <Progress value={Math.min(summary.incomeCommitment, 100)} className="h-2" />
-              <div className="text-[10px] font-mono text-muted-foreground mt-1">Meta: abaixo de 70%</div>
+              <div className="text-[10px] font-mono text-muted-foreground mt-1">Target: below 70%</div>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <div className="text-[10px] font-mono text-muted-foreground tracking-wider">TAXA DE INVESTIMENTO</div>
+                <div className="text-[10px] font-mono text-muted-foreground tracking-wider">INVESTMENT RATE</div>
                 <div className="text-xs font-mono font-bold text-foreground">{formatPercent(summary.investmentRate)}</div>
               </div>
               <Progress value={Math.min(summary.investmentRate, 100)} className="h-2" />
-              <div className="text-[10px] font-mono text-muted-foreground mt-1">Meta: acima de 20%</div>
+              <div className="text-[10px] font-mono text-muted-foreground mt-1">Target: above 20%</div>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <div className="text-[10px] font-mono text-muted-foreground tracking-wider">SALDO LIVRE / RECEITA</div>
+                <div className="text-[10px] font-mono text-muted-foreground tracking-wider">FREE BALANCE / INCOME</div>
                 <div className="text-xs font-mono font-bold text-foreground">
                   {formatPercent(Math.max(0, summary.totalRevenue > 0 ? (summary.freeBalance / summary.totalRevenue) * 100 : 0))}
                 </div>
@@ -502,7 +503,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
                 value={Math.max(0, Math.min(summary.totalRevenue > 0 ? (summary.freeBalance / summary.totalRevenue) * 100 : 0, 100))}
                 className="h-2"
               />
-              <div className="text-[10px] font-mono text-muted-foreground mt-1">Meta: acima de 10%</div>
+              <div className="text-[10px] font-mono text-muted-foreground mt-1">Target: above 10%</div>
             </div>
           </div>
         </div>
