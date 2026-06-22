@@ -25,6 +25,22 @@ export interface AIProviderDef {
   envKey: string;
   /** Cor para identificação visual */
   color: string;
+  /** true = plano por créditos em USD debitados por token; false = plano free com limite diário */
+  billedByCredit: boolean;
+  /** Preço oficial do provider em USD por 1M tokens (apenas providers billedByCredit) */
+  pricePerMillionTokens?: { input: number; output: number };
+}
+
+/** Calcula o custo real em USD de uma chamada, conforme o preço oficial do modelo. */
+export function calculateCostUSD(
+  providerId: ProviderId,
+  inputTokens: number,
+  outputTokens: number
+): number {
+  const def = getProvider(providerId);
+  if (!def.pricePerMillionTokens) return 0;
+  const { input, output } = def.pricePerMillionTokens;
+  return (inputTokens / 1_000_000) * input + (outputTokens / 1_000_000) * output;
 }
 
 export const AI_PROVIDERS: AIProviderDef[] = [
@@ -40,32 +56,39 @@ export const AI_PROVIDERS: AIProviderDef[] = [
     supportsFiles: true,
     envKey: "GEMINI_API_KEY",
     color: "hsl(142 58% 44%)", // verde
+    billedByCredit: false,
   },
   {
     id: "openai",
     label: "OpenAI",
     model: "gpt-4o-mini",
     modelLabel: "GPT-4o Mini",
-    freeInfo: "Sem free tier — pago por token",
+    freeInfo: "Plano por créditos — saldo em USD debitado por token",
     freeMonthlyRequests: null,
     freeDailyRequests: null,
     freeDailyTokens: null,
     supportsFiles: true,
     envKey: "OPENAI_API_KEY",
     color: "hsl(220 70% 55%)", // azul
+    billedByCredit: true,
+    // Preço oficial gpt-4o-mini: $0.15/1M input, $0.60/1M output
+    pricePerMillionTokens: { input: 0.15, output: 0.6 },
   },
   {
     id: "anthropic",
     label: "Anthropic",
     model: "claude-haiku-4-5",
     modelLabel: "Claude Haiku 4.5",
-    freeInfo: "Sem free tier — pago por token",
+    freeInfo: "Plano por créditos — saldo em USD debitado por token",
     freeMonthlyRequests: null,
     freeDailyRequests: null,
     freeDailyTokens: null,
     supportsFiles: true,
     envKey: "ANTHROPIC_API_KEY",
     color: "hsl(28 85% 56%)", // laranja
+    billedByCredit: true,
+    // Preço oficial Claude Haiku 4.5: $1/1M input, $5/1M output
+    pricePerMillionTokens: { input: 1, output: 5 },
   },
   {
     id: "groq",
@@ -79,6 +102,7 @@ export const AI_PROVIDERS: AIProviderDef[] = [
     supportsFiles: false,
     envKey: "GROQ_API_KEY",
     color: "hsl(280 50% 60%)", // lilás
+    billedByCredit: false,
   },
 ];
 

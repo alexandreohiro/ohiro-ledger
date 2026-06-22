@@ -23,7 +23,7 @@ import {
   MAX_FILES_PER_REQUEST,
 } from "@/lib/security";
 import type { ProviderId } from "@/lib/ai-providers";
-import { getProvider } from "@/lib/ai-providers";
+import { getProvider, calculateCostUSD } from "@/lib/ai-providers";
 
 export const maxDuration = 60;
 
@@ -584,6 +584,24 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
     );
   }
 
+  // ── Plano por créditos: providers pagos (Anthropic/OpenAI) só seguem se houver
+  // saldo em USD. Providers free (Gemini/Groq) continuam no limite diário (client-side).
+  const providerDef = getProvider(providerId);
+  if (providerDef.billedByCredit) {
+    const { data: balance } = await supabase.rpc("check_ai_credit_balance", {
+      p_user_id: user.id,
+      p_provider_id: providerId,
+    });
+    if (!balance || Number(balance) <= 0) {
+      return new Response(
+        JSON.stringify({
+          error: `Saldo de créditos esgotado para ${providerDef.label} (${providerDef.modelLabel}). Adicione mais créditos ou selecione um modelo gratuito (Gemini, Groq).`,
+        }),
+        { status: 402 }
+      );
+    }
+  }
+
   let usedProviderId: ProviderId = candidates[0];
   let lastErrorMsg = "";
 
@@ -604,6 +622,22 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
               temperature: 0.3,
               onError: (err) => {
                 console.error(`[ai/chat][${providerDef.modelLabel}] stream error:`, err);
+              },
+              onFinish: async ({ totalUsage }) => {
+                if (!providerDef.billedByCredit) return;
+                const inputTokens = totalUsage.inputTokens ?? 0;
+                const outputTokens = totalUsage.outputTokens ?? 0;
+                const cost = calculateCostUSD(candidateId, inputTokens, outputTokens);
+                if (cost <= 0) return;
+                const { error } = await supabase.rpc("debit_ai_credit", {
+                  p_user_id: user.id,
+                  p_provider_id: candidateId,
+                  p_model: providerDef.model,
+                  p_input_tokens: inputTokens,
+                  p_output_tokens: outputTokens,
+                  p_cost_usd: cost,
+                });
+                if (error) console.error(`[ai/chat][${providerDef.modelLabel}] debit error:`, error.message);
               },
             });
 

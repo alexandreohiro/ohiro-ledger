@@ -184,6 +184,22 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   const [showProviderPanel, setShowProviderPanel] = useState(false);
   // Uso diário rastreado localmente
   const [todayUsage, setTodayUsage] = useState(() => getTodayUsage());
+  // Saldo de créditos (USD) dos providers pagos — vem do Supabase (ai_credits)
+  const [creditBalances, setCreditBalances] = useState<Partial<Record<ProviderId, number>>>({});
+
+  const refreshCreditBalances = useCallback(async () => {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase.from("ai_credits").select("provider_id, balance_usd");
+    if (!data) return;
+    const next: Partial<Record<ProviderId, number>> = {};
+    for (const row of data) next[row.provider_id as ProviderId] = Number(row.balance_usd);
+    setCreditBalances(next);
+  }, []);
+
+  useEffect(() => {
+    refreshCreditBalances();
+  }, [refreshCreditBalances]);
 
   const financialContext = buildFinancialContext(transactions, investments, debts);
 
@@ -226,15 +242,19 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         setApiError("Limite de requisições atingido. Aguarde alguns instantes ou troque de modelo.");
       } else if (msg.includes("401") || lower.includes("autenticad")) {
         setApiError("Sessão expirada. Recarregue a página.");
-      } else if (lower.includes("não suporta") || lower.includes("não configurada")) {
+      } else if (lower.includes("não suporta") || lower.includes("não configurada") || lower.includes("saldo de créditos")) {
         // Mensagens já vêm em português e específicas do servidor (ex: provider sem
-        // suporte a arquivos, API key ausente) — mostra direto, sem genericizar.
+        // suporte a arquivos, API key ausente, créditos esgotados) — mostra direto, sem genericizar.
         setApiError(msg);
       } else if (lower.includes("failed to fetch") || lower.includes("network")) {
         setApiError("Sem conexão com o servidor. Verifique sua internet e tente novamente.");
       } else {
         setApiError("Falha na comunicação com a IA. Verifique sua conexão e tente novamente.");
       }
+    },
+    onFinish: () => {
+      // Atualiza o saldo de créditos exibido após cada resposta (providers pagos debitam por token)
+      refreshCreditBalances();
     },
   });
 
@@ -452,6 +472,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             const limit = prov.freeDailyRequests;
             const remaining = limit != null ? Math.max(limit - usage, 0) : null;
             const isNearLimit = limit != null && usage / limit > 0.8;
+            const balance = creditBalances[selectedProvider];
+            const isLowBalance = prov.billedByCredit && balance != null && balance < 1;
             return (
               <button
                 onClick={() => setShowProviderPanel((v) => !v)}
@@ -475,6 +497,18 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                     )}
                   >
                     {remaining} restantes
+                  </span>
+                )}
+                {prov.billedByCredit && balance != null && (
+                  <span
+                    className={cn(
+                      "hidden sm:inline px-1.5 py-0.5 rounded border text-[9px]",
+                      isLowBalance
+                        ? "border-destructive/40 text-destructive bg-destructive/10"
+                        : "border-border/40 text-muted-foreground/70 bg-muted/20"
+                    )}
+                  >
+                    ${balance.toFixed(2)} saldo
                   </span>
                 )}
                 <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
@@ -506,6 +540,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           providers={AI_PROVIDERS}
           selected={selectedProvider}
           todayUsage={todayUsage}
+          creditBalances={creditBalances}
           onSelect={(id) => {
             setSelectedProvider(id);
             setShowProviderPanel(false);
@@ -744,6 +779,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           const prov = AI_PROVIDERS.find((p) => p.id === selectedProvider)!;
           const usage = todayUsage.requests[selectedProvider] ?? 0;
           const limit = prov.freeDailyRequests;
+          const balance = creditBalances[selectedProvider];
           return (
             <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
               {prov.label} · {prov.modelLabel}
@@ -752,7 +788,11 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
                   {usage}/{limit} req hoje
                 </span></>
               )}
-              {!limit && <> · pago por token</>}
+              {prov.billedByCredit && (
+                <> · <span className={cn(balance != null && balance < 1 ? "text-destructive/50" : "")}>
+                  ${balance != null ? balance.toFixed(2) : "?"} de crédito restante
+                </span></>
+              )}
               {" · "}Arraste arquivos para a tela
             </p>
           );
@@ -768,11 +808,12 @@ interface ProviderPanelProps {
   providers: AIProviderDef[];
   selected: ProviderId;
   todayUsage: ReturnType<typeof getTodayUsage>;
+  creditBalances: Partial<Record<ProviderId, number>>;
   onSelect: (id: ProviderId) => void;
   onClose: () => void;
 }
 
-function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: ProviderPanelProps) {
+function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSelect, onClose }: ProviderPanelProps) {
   return (
     <div className="shrink-0 border-b border-border/40 bg-card/50 backdrop-blur-sm px-4 py-3">
       <div className="flex items-center justify-between mb-3">
@@ -799,17 +840,20 @@ function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: P
           const usagePct = limit ? Math.min(usage / limit, 1) : 0;
           const isNearLimit = limit != null && usagePct > 0.8;
           const isAtLimit = limit != null && usage >= limit;
+          const balance = creditBalances[prov.id];
+          const isOutOfCredit = prov.billedByCredit && balance != null && balance <= 0;
+          const isDisabled = isAtLimit || isOutOfCredit;
 
           return (
             <button
               key={prov.id}
-              onClick={() => !isAtLimit && onSelect(prov.id)}
-              disabled={isAtLimit}
+              onClick={() => !isDisabled && onSelect(prov.id)}
+              disabled={isDisabled}
               className={cn(
                 "flex flex-col gap-2 p-3 rounded-lg border text-left transition-all",
                 isSelected
                   ? "border-primary/50 bg-primary/8"
-                  : isAtLimit
+                  : isDisabled
                   ? "border-border/30 bg-muted/10 opacity-50 cursor-not-allowed"
                   : "border-border/40 bg-card/40 hover:border-border/80 hover:bg-card/70"
               )}
@@ -870,6 +914,18 @@ function ProviderPanel({ providers, selected, todayUsage, onSelect, onClose }: P
                   </div>
                   <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
                     {isAtLimit ? "Limite atingido — use outro modelo" : prov.freeInfo}
+                  </div>
+                </div>
+              ) : prov.billedByCredit ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[9px] font-mono">
+                    <span className="text-muted-foreground/60">Saldo de créditos</span>
+                    <span className={cn(isOutOfCredit ? "text-destructive/70" : "text-muted-foreground/60")}>
+                      ${balance != null ? balance.toFixed(2) : "?"}
+                    </span>
+                  </div>
+                  <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
+                    {isOutOfCredit ? "Sem saldo — adicione créditos ou use outro modelo" : prov.freeInfo}
                   </div>
                 </div>
               ) : (
