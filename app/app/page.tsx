@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getTransactions, getInvestments, getDebts } from '@/lib/actions'
+import { getTransactions, getInvestments, getDebts, getAccounts } from '@/lib/actions'
 import {
   getNotifications,
   getUserSettings,
@@ -21,10 +21,11 @@ export default async function AppPage() {
   // Sincroniza alertas de dívidas (idempotente — não duplica notificações)
   await syncDebtNotifications()
 
-  const [transactions, investments, debts, notifications, settings] = await Promise.all([
+  const [transactions, investments, debts, accounts, notifications, settings] = await Promise.all([
     getTransactions(),
     getInvestments(),
     getDebts(),
+    getAccounts(),
     getNotifications(),
     getUserSettings(),
   ])
@@ -35,6 +36,7 @@ export default async function AppPage() {
       initialTransactions={transactions}
       initialInvestments={investments}
       initialDebts={debts}
+      initialAccounts={accounts}
       initialNotifications={notifications}
       initialNotificationDays={settings.notificationDaysBefore}
     />

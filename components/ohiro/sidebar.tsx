@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   BrainCircuit,
+  Landmark,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -25,6 +26,7 @@ const navItems: { id: ActiveView; label: string; icon: React.ElementType; shortL
   { id: "receitas", label: "Receitas", shortLabel: "RECV", icon: TrendingUp },
   { id: "dividas", label: "Dívidas", shortLabel: "DVDA", icon: CreditCard },
   { id: "investimentos", label: "Investimentos", shortLabel: "INVS", icon: LineChart },
+  { id: "contas", label: "Bancos", shortLabel: "BANK", icon: Landmark },
   { id: "projecoes", label: "Projeções", shortLabel: "PROJ", icon: BarChart3 },
   { id: "ia", label: "IA Financeira", shortLabel: "IA", icon: BrainCircuit },
   { id: "configuracoes", label: "Configurações", shortLabel: "CONF", icon: Settings },

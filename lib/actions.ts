@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { Transaction, Investment, Debt } from '@/lib/types'
+import type { Transaction, Investment, Debt, Account } from '@/lib/types'
 
 // ─── TRANSACTIONS ──────────────────────────────────────────────────────────────
 
@@ -297,6 +297,93 @@ export async function deleteDebt(id: string): Promise<void> {
 
   const { error } = await supabase
     .from('debts')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/app')
+}
+
+// ─── ACCOUNTS ──────────────────────────────────────────────────────────────────
+
+export async function getAccounts(): Promise<Account[]> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    balance: Number(row.balance),
+    currency: row.currency,
+    yieldIndex: row.yield_index,
+    yieldRatePct: Number(row.yield_rate_pct),
+  }))
+}
+
+export async function addAccount(account: Omit<Account, 'id'>): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
+  const { error } = await supabase.from('accounts').insert({
+    user_id: user.id,
+    name: account.name,
+    balance: account.balance,
+    currency: account.currency,
+    yield_index: account.yieldIndex,
+    yield_rate_pct: account.yieldRatePct,
+  })
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/app')
+}
+
+export async function updateAccount(account: Account): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
+  const { error } = await supabase
+    .from('accounts')
+    .update({
+      name: account.name,
+      balance: account.balance,
+      currency: account.currency,
+      yield_index: account.yieldIndex,
+      yield_rate_pct: account.yieldRatePct,
+    })
+    .eq('id', account.id)
+    .eq('user_id', user.id)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/app')
+}
+
+export async function deleteAccount(id: string): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
+  const { error } = await supabase
+    .from('accounts')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)

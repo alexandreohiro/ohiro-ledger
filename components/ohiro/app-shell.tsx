@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ActiveView, Transaction, Investment, Debt } from "@/lib/types";
+import { ActiveView, Transaction, Investment, Debt, Account } from "@/lib/types";
 import { calcFinancialSummary } from "@/lib/calculations";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -12,6 +12,7 @@ import { LedgerView } from "./views/ledger-view";
 import { ExpensesRevenuesView } from "./views/expenses-revenues-view";
 import { DebtsView } from "./views/debts-view";
 import { InvestmentsView } from "./views/investments-view";
+import { AccountsView } from "./views/accounts-view";
 import { ProjectionsView } from "./views/projections-view";
 import { SettingsView } from "./views/settings-view";
 import { AIView } from "./views/ai-view";
@@ -25,6 +26,9 @@ import {
   addDebt,
   updateDebt,
   deleteDebt,
+  addAccount,
+  updateAccount,
+  deleteAccount,
   signOut,
 } from "@/lib/actions";
 import type { Notification } from "@/lib/notification-actions";
@@ -36,6 +40,7 @@ interface AppShellProps {
   initialTransactions: Transaction[];
   initialInvestments: Investment[];
   initialDebts: Debt[];
+  initialAccounts: Account[];
   initialNotifications: Notification[];
   initialNotificationDays: number;
 }
@@ -45,6 +50,7 @@ export function AppShell({
   initialTransactions,
   initialInvestments,
   initialDebts,
+  initialAccounts,
   initialNotifications,
   initialNotificationDays,
 }: AppShellProps) {
@@ -58,6 +64,7 @@ export function AppShell({
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [investments, setInvestments] = useState<Investment[]>(initialInvestments);
   const [debts, setDebts] = useState<Debt[]>(initialDebts);
+  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
 
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -173,6 +180,39 @@ export function AppShell({
     }
   }
 
+  // ── Accounts ──────────────────────────────────────────────────────────────
+  async function handleAddAccount(account: Omit<Account, "id">) {
+    const tempId = crypto.randomUUID();
+    setAccounts((prev) => [{ ...account, id: tempId }, ...prev]);
+    try {
+      await addAccount(account);
+      startTransition(() => router.refresh());
+    } catch {
+      setAccounts((prev) => prev.filter((a) => a.id !== tempId));
+      toast.error("Erro ao adicionar conta");
+    }
+  }
+
+  async function handleUpdateAccount(account: Account) {
+    setAccounts((prev) => prev.map((a) => (a.id === account.id ? account : a)));
+    try {
+      await updateAccount(account);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao atualizar conta");
+    }
+  }
+
+  async function handleDeleteAccount(id: string) {
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    try {
+      await deleteAccount(id);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Erro ao excluir conta");
+    }
+  }
+
   // ── Sign Out ──────────────────────────────────────────────────────────────
   async function handleSignOut() {
     await signOut();
@@ -189,10 +229,12 @@ export function AppShell({
       ...transactions.map((t) => deleteTransaction(t.id)),
       ...investments.map((i) => deleteInvestment(i.id)),
       ...debts.map((d) => deleteDebt(d.id)),
+      ...accounts.map((a) => deleteAccount(a.id)),
     ]);
     setTransactions([]);
     setInvestments([]);
     setDebts([]);
+    setAccounts([]);
     toast.success("Dados resetados");
     startTransition(() => router.refresh());
   }
@@ -250,6 +292,14 @@ export function AppShell({
               onUpdate={handleUpdateInvestment}
               onRemove={handleDeleteInvestment}
               onSetUsdRate={setUsdRate}
+            />
+          )}
+          {activeView === "contas" && (
+            <AccountsView
+              accounts={accounts}
+              onAdd={handleAddAccount}
+              onUpdate={handleUpdateAccount}
+              onRemove={handleDeleteAccount}
             />
           )}
           {activeView === "projecoes" && (

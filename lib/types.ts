@@ -52,6 +52,17 @@ export interface Investment {
   monthlyContribution: number;
 }
 
+export interface Account {
+  id: string;
+  name: string;
+  balance: number;
+  currency: Currency;
+  /** Índice de rendimento, ex.: "CDI", "Poupança", "" se não rende */
+  yieldIndex: string;
+  /** Percentual do índice, ex.: 100 = 100% do CDI */
+  yieldRatePct: number;
+}
+
 export type DebtStatus = "Ativo" | "Quitado" | "Atrasado" | "Renegociado";
 export type DebtPriority = "Baixo" | "Médio" | "Alto" | "Crítico";
 
@@ -82,4 +93,4 @@ export interface FinancialSummary {
   totalPatrimony: number;
 }
 
-export type ActiveView = "dashboard" | "ledger" | "gastos" | "receitas" | "dividas" | "investimentos" | "projecoes" | "ia" | "configuracoes";
+export type ActiveView = "dashboard" | "ledger" | "gastos" | "receitas" | "dividas" | "investimentos" | "contas" | "projecoes" | "ia" | "configuracoes";
