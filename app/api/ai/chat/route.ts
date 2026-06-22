@@ -374,6 +374,79 @@ function buildTools(userId: string) {
       },
     }),
 
+    findMissingRecurringExpenses: tool({
+      description:
+        "Detecta lançamentos recorrentes (ex: água, luz, internet, aluguel) que apareceram nos últimos meses mas estão ausentes no mês de referência. Use SEMPRE depois de processar um contracheque/salário, para checar se o usuário esqueceu de lançar alguma conta — o saldo livre pode estar superestimado por causa disso.",
+      inputSchema: z.object({
+        referenceMonth: z.string().describe("Mês de referência no formato YYYY-MM (geralmente o mês do contracheque processado)"),
+      }),
+      execute: async (input) => {
+        try {
+          const supabase = await createClient();
+          const [refYear, refMonthNum] = input.referenceMonth.split("-").map(Number);
+          const lookbackStart = new Date(refYear, refMonthNum - 1 - 3, 1);
+
+          const { data, error } = await supabase
+            .from("transactions")
+            .select("category,subcategory,description,amount,date,recurrence,type")
+            .eq("user_id", userId)
+            .eq("type", "Gasto")
+            .gte("date", lookbackStart.toISOString().slice(0, 10))
+            .lt("date", new Date(refYear, refMonthNum, 1).toISOString().slice(0, 10))
+            .order("date", { ascending: false })
+            .limit(500);
+
+          if (error) return { success: false, error: error.message };
+          const rows = data ?? [];
+
+          const refMonthKey = `${refYear}-${String(refMonthNum).padStart(2, "0")}`;
+          const monthKeyOf = (d: string) => d.slice(0, 7);
+
+          // Agrupa por categoria+subcategoria, contando em quantos dos 3 meses anteriores ao mês de referência apareceu
+          const priorMonthKeys = [1, 2, 3].map((n) => {
+            const d = new Date(refYear, refMonthNum - 1 - n, 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          });
+
+          type Group = { category: string; subcategory: string; monthsPresent: Set<string>; amounts: number[]; lastDescription: string };
+          const groups = new Map<string, Group>();
+          for (const row of rows) {
+            const mk = monthKeyOf(row.date);
+            if (mk === refMonthKey) continue; // só nos interessa o histórico anterior
+            const key = `${row.category}|${row.subcategory ?? ""}`;
+            const g: Group = groups.get(key) ?? { category: row.category, subcategory: row.subcategory ?? "", monthsPresent: new Set<string>(), amounts: [], lastDescription: row.description };
+            g.monthsPresent.add(mk);
+            g.amounts.push(Number(row.amount));
+            groups.set(key, g);
+          }
+
+          const presentThisMonth = new Set(
+            rows.filter((r) => monthKeyOf(r.date) === refMonthKey).map((r) => `${r.category}|${r.subcategory ?? ""}`)
+          );
+
+          const missing = Array.from(groups.values())
+            .filter((g) => {
+              const key = `${g.category}|${g.subcategory}`;
+              if (presentThisMonth.has(key)) return false;
+              // Recorrente: apareceu em pelo menos 2 dos 3 meses anteriores
+              const monthsHit = priorMonthKeys.filter((mk) => g.monthsPresent.has(mk)).length;
+              return monthsHit >= 2;
+            })
+            .map((g) => ({
+              category: g.category,
+              subcategory: g.subcategory,
+              lastDescription: g.lastDescription,
+              averageAmount: g.amounts.reduce((s, a) => s + a, 0) / g.amounts.length,
+              monthsSeenRecently: priorMonthKeys.filter((mk) => g.monthsPresent.has(mk)).length,
+            }));
+
+          return { success: true, referenceMonth: refMonthKey, missingCount: missing.length, missing };
+        } catch (e) {
+          return { success: false, error: String(e) };
+        }
+      },
+    }),
+
     updateDebt: tool({
       description:
         "Atualiza uma dívida existente (ex: registrar pagamento de parcela, mudar status para Quitado, atualizar saldo devedor).",
@@ -530,6 +603,7 @@ ${sanitizeMessage(context, 5000)}
 ### Leitura e busca
 - **readFinancialData**: Use no início de análises detalhadas, ou quando o contexto parecer desatualizado. Retorna IDs reais das transações/dívidas/investimentos.
 - **searchTransactions**: Use para encontrar lançamentos específicos por descrição, categoria, tipo ou período. Sempre use antes de updateTransaction ou deleteTransaction para obter o ID correto.
+- **findMissingRecurringExpenses**: Use SEMPRE após inserir um contracheque/salário. Verifica se contas recorrentes dos últimos meses (água, luz, internet, aluguel, plano de saúde etc.) ainda não foram lançadas no mês de referência — o usuário pode ter pago um boleto e esquecido de registrar, fazendo o saldo livre parecer maior do que realmente é.
 
 ### Criação
 - **addTransaction**: Cria novos lançamentos (receitas, gastos, dívidas, transferências, reservas).
@@ -546,7 +620,7 @@ ${sanitizeMessage(context, 5000)}
 ## COMPORTAMENTO
 - Responda SEMPRE em português do Brasil, linguagem financeira clara e objetiva.
 - Valores monetários: R$ com vírgula decimal (ex: R$ 1.234,56).
-- Ao receber contracheque (imagem/PDF): extraia salário bruto, todos os descontos (INSS, IR, planos) e salário líquido. Insira cada item com addTransaction após mostrar o resumo ao usuário.
+- Ao receber contracheque (imagem/PDF): extraia salário bruto, todos os descontos (INSS, IR, planos) e salário líquido. Insira cada item com addTransaction após mostrar o resumo ao usuário. Em seguida, SEMPRE chame findMissingRecurringExpenses para o mês do contracheque — se houver contas recorrentes (água, luz, internet, etc.) ausentes nesse mês, avise o usuário explicitamente: "Notei que sua conta de [categoria] (~R$ [valor médio]) aparece nos últimos meses mas não foi lançada em [mês] — você já pagou e esqueceu de registrar, ou ainda está pendente?" e ofereça para adicionar com addTransaction caso o usuário confirme.
 - Ao receber extrato bancário ou fatura: liste todas as transações identificadas, confirme com o usuário e depois insira com addTransaction.
 - Após qualquer mutação de dados, avise: "Os dados foram salvos. Recarregue a página (F5 ou Ctrl+R) para ver as atualizações no dashboard."
 - Quando o usuário pedir "edite", "atualize", "mude", "corrija" ou "apague" algo: use searchTransactions para localizar, mostre o que foi encontrado e peça confirmação antes de executar.
