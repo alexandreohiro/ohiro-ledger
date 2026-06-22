@@ -4,9 +4,8 @@ import { useState, useMemo } from "react";
 import { Transaction, Investment } from "@/lib/types";
 import { calcProjectionFV, calcFinancialSummary, formatCurrency } from "@/lib/calculations";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
-import { Calculator, TrendingUp, CreditCard, Scissors } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend } from "recharts";
+import { Calculator, TrendingUp, CreditCard, Scissors, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProjectionsViewProps {
@@ -14,23 +13,7 @@ interface ProjectionsViewProps {
   investments: Investment[];
 }
 
-interface ScenarioResult {
-  label: string;
-  value: number;
-  description: string;
-  color: string;
-}
-
-function ScenarioCard({ label, value, description, color, children }: ScenarioResult & { children?: React.ReactNode }) {
-  return (
-    <div className={cn("rounded-lg border p-4 bg-card/60", `border-[${color}/20]`)}>
-      <div className="text-[11px] font-mono text-muted-foreground/60 tracking-widest uppercase mb-2">{label}</div>
-      <div className={`text-2xl font-mono font-bold mb-1`} style={{ color }}>{formatCurrency(value)}</div>
-      <div className="text-[11px] font-mono text-muted-foreground">{description}</div>
-      {children}
-    </div>
-  );
-}
+const HORIZONS = [3, 6, 12, 24] as const;
 
 export function ProjectionsView({ transactions, investments }: ProjectionsViewProps) {
   const summary = useMemo(() => calcFinancialSummary(transactions, investments), [transactions, investments]);
@@ -40,6 +23,7 @@ export function ProjectionsView({ transactions, investments }: ProjectionsViewPr
   const [annualRate, setAnnualRate] = useState(8);
   const [debtAmount, setDebtAmount] = useState(500);
   const [expenseCut, setExpenseCut] = useState(100);
+  const [horizon, setHorizon] = useState<typeof HORIZONS[number]>(12);
 
   // Projection results
   const proj3 = calcProjectionFV(monthlyInvestment, 3, annualRate / 100);
@@ -58,11 +42,18 @@ export function ProjectionsView({ transactions, investments }: ProjectionsViewPr
   const annualExpenseCutImpact = expenseCut * 12;
   const newFreeBalance = summary.freeBalance + debtImpact;
 
-  // Monthly breakdown projection
-  const monthlyData = Array.from({ length: 12 }, (_, i) => ({
-    month: `Mês ${i + 1}`,
-    patrimony: calcProjectionFV(monthlyInvestment, i + 1, annualRate / 100),
+  // Cenário combinado: aporte base + dívida quitada + corte de gastos redirecionados para investimento
+  const combinedMonthly = monthlyInvestment + debtImpact + expenseCut;
+
+  // Evolução patrimonial: cenário base vs combinado, ao longo do horizonte selecionado
+  const monthlyData = Array.from({ length: horizon }, (_, i) => ({
+    month: `M${i + 1}`,
+    base: calcProjectionFV(monthlyInvestment, i + 1, annualRate / 100),
+    combinado: calcProjectionFV(combinedMonthly, i + 1, annualRate / 100),
   }));
+
+  const combinedAtHorizon = monthlyData[monthlyData.length - 1]?.combinado ?? 0;
+  const baseAtHorizon = monthlyData[monthlyData.length - 1]?.base ?? 0;
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-[1400px] mx-auto">
@@ -174,24 +165,63 @@ export function ProjectionsView({ transactions, investments }: ProjectionsViewPr
 
       {/* Projection chart */}
       <div className="rounded-lg border border-border/40 bg-card/60 p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Calculator className="size-4 text-[hsl(var(--accent))]" />
-          <span className="text-[11px] font-mono text-muted-foreground/60 tracking-widest uppercase">
-            Evolução Patrimonial — {monthlyInvestment > 0 ? `R$ ${monthlyInvestment}/mês × 12 meses` : "configure o aporte"}
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Calculator className="size-4 text-[hsl(var(--accent))]" />
+            <span className="text-[11px] font-mono text-muted-foreground/60 tracking-widest uppercase">
+              Evolução Patrimonial
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {HORIZONS.map((h) => (
+              <button
+                key={h}
+                onClick={() => setHorizon(h)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors",
+                  horizon === h ? "bg-[hsl(var(--accent))/15] text-[hsl(var(--accent))] border border-[hsl(var(--accent))/30]" : "text-muted-foreground hover:text-foreground border border-transparent"
+                )}
+              >
+                {h}m
+              </button>
+            ))}
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+            <defs>
+              <linearGradient id="gradCombinado" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--risk-low))" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="hsl(var(--risk-low))" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="gradBase" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: "monospace", fill: "hsl(var(--muted-foreground))" }} />
             <YAxis tick={{ fontSize: 10, fontFamily: "monospace", fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `R$${(v / 1000).toFixed(1)}k`} />
             <Tooltip
-              formatter={(v) => [formatCurrency(Number(v)), "Patrimônio"]}
+              formatter={(v, name) => [formatCurrency(Number(v)), name === "combinado" ? "Cenário combinado" : "Aporte atual"]}
               contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontFamily: "monospace", fontSize: 11 }}
             />
-            <Bar dataKey="patrimony" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />
-          </BarChart>
+            <Legend
+              formatter={(v) => (v === "combinado" ? "Cenário combinado" : "Aporte atual")}
+              wrapperStyle={{ fontFamily: "monospace", fontSize: 11 }}
+            />
+            <Area type="monotone" dataKey="combinado" stroke="hsl(var(--risk-low))" fill="url(#gradCombinado)" strokeWidth={2} />
+            <Area type="monotone" dataKey="base" stroke="hsl(var(--accent))" fill="url(#gradBase)" strokeWidth={2} />
+          </AreaChart>
         </ResponsiveContainer>
+        {combinedMonthly > monthlyInvestment && (
+          <div className="mt-3 flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
+            <Sparkles className="size-3.5 text-[hsl(var(--risk-low))]" />
+            Combinando dívida quitada + corte de gastos, seu patrimônio em {horizon} meses seria
+            <span className="font-bold text-[hsl(var(--risk-low))]">{formatCurrency(combinedAtHorizon)}</span>
+            em vez de <span className="font-bold text-[hsl(var(--accent))]">{formatCurrency(baseAtHorizon)}</span>.
+          </div>
+        )}
       </div>
 
       {/* Key questions answered */}
