@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Transaction, TransactionType, TransactionStatus } from "@/lib/types";
 import {
   formatCurrency,
-  getAmountInBRL,
+  getAmountInUSD,
   calcTotalRevenue,
   calcTotalExpenses,
   calcTotalDebts,
@@ -321,7 +321,7 @@ export function LedgerView({ transactions, selectedMonthKey, availableMonths, on
                               <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{t.category}</td>
                               <td className="px-3 py-2.5 whitespace-nowrap">
                                 <span className={cn("font-bold", TYPE_COLORS[t.type])}>
-                                  {t.type === "Receita" ? "+" : "-"}{formatCurrency(getAmountInBRL(t))}
+                                  {t.type === "Receita" ? "+" : "-"}{formatCurrency(getAmountInUSD(t))}
                                 </span>
                                 {t.currency !== "BRL" && (
                                   <div className="text-[10px] text-muted-foreground">

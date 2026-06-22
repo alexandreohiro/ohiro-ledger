@@ -7,7 +7,7 @@ import {
   formatCurrency,
   formatPercent,
   groupByCategory,
-  getAmountInBRL,
+  getAmountInUSD,
   buildMonthlyChartData,
   formatMonthLabel,
 } from "@/lib/calculations";
@@ -180,7 +180,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
       Object.entries(grouped)
         .map(([cat, txns]) => ({
           name: cat,
-          value: txns.reduce((s, t) => s + getAmountInBRL(t), 0),
+          value: txns.reduce((s, t) => s + getAmountInUSD(t), 0),
           color: getCategoryColor(cat),
         }))
         .sort((a, b) => b.value - a.value),
@@ -457,7 +457,7 @@ export function DashboardView({ transactions, monthTransactions, investments, se
                     <span className={`text-xs font-mono font-bold ${
                       t.type === "Receita" ? "text-[hsl(var(--risk-low))]" : "text-foreground"
                     }`}>
-                      {t.type === "Receita" ? "+" : "-"}{formatCurrency(getAmountInBRL(t))}
+                      {t.type === "Receita" ? "+" : "-"}{formatCurrency(getAmountInUSD(t))}
                     </span>
                   </div>
                 </div>

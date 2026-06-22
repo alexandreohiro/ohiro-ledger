@@ -50,6 +50,8 @@ export interface Investment {
   exchangeRate: number;
   convertedAmountBRL: number;
   monthlyContribution: number;
+  /** Ticker da criptomoeda (ex: BTC, ETH) — só relevante quando class === "Cripto". Groundwork para integração futura de preço em tempo real. */
+  cryptoSymbol?: string;
 }
 
 export type DebtStatus = "Ativo" | "Quitado" | "Atrasado" | "Renegociado";

@@ -1,32 +1,33 @@
 import { Transaction, Investment, FinancialSummary, RiskLevel } from "./types";
 
-export function getAmountInBRL(transaction: Transaction): number {
-  if (transaction.currency === "BRL") return transaction.amount;
+/** Converte para a moeda base do sistema (USD), usando exchangeRate quando a transação não está em USD. */
+export function getAmountInUSD(transaction: Transaction): number {
+  if (transaction.currency === "USD") return transaction.amount;
   return transaction.amount * (transaction.exchangeRate || 1);
 }
 
 export function calcTotalRevenue(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Receita")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcTotalExpenses(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Gasto")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcTotalDebts(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Dívida")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcTotalInvestments(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Investimento")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcFreeBalance(
@@ -93,8 +94,14 @@ export function calcFinancialSummary(
   };
 }
 
-export function formatCurrency(value: number, currency = "BRL"): string {
-  return new Intl.NumberFormat("pt-BR", {
+const CURRENCY_LOCALE: Record<string, string> = {
+  USD: "en-US",
+  BRL: "pt-BR",
+  EUR: "de-DE",
+};
+
+export function formatCurrency(value: number, currency = "USD"): string {
+  return new Intl.NumberFormat(CURRENCY_LOCALE[currency] ?? "en-US", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
@@ -138,20 +145,20 @@ export function txMonthKey(dateStr: string): string {
 /** Formats "YYYY-MM" to "Jan/2025" */
 export function formatMonthLabel(key: string): string {
   const [year, month] = key.split("-");
-  const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${MONTHS[parseInt(month, 10) - 1]}/${year}`;
 }
 
-/** Formats a month index (0-11) + year to "Jan/2025" */
+/** Formats a month index (0-11) + year to "January 2025" */
 export function formatMonthYear(month: number, year: number): string {
-  const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const MONTHS = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
   return `${MONTHS[month]} ${year}`;
 }
 
 /** Formats a month index to short label */
 export function formatMonthShort(month: number, year: number): string {
-  const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${MONTHS[month]}/${String(year).slice(2)}`;
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  getAmountInBRL,
+  getAmountInUSD,
   calcTotalRevenue,
   calcTotalExpenses,
   calcTotalDebts,
@@ -33,7 +33,7 @@ function makeTx(overrides: Partial<Transaction> = {}): Transaction {
     subcategory: "",
     description: "Salário mensal",
     amount: 1000,
-    currency: "BRL",
+    currency: "USD",
     exchangeRate: 1,
     status: "Pago",
     recurrence: "Mensal",
@@ -47,7 +47,7 @@ function makeInv(overrides: Partial<Investment> = {}): Investment {
     assetName: "Tesouro Direto",
     class: "Renda Fixa",
     amount: 5000,
-    currency: "BRL",
+    currency: "USD",
     exchangeRate: 1,
     convertedAmountBRL: 5000,
     monthlyContribution: 200,
@@ -55,27 +55,27 @@ function makeInv(overrides: Partial<Investment> = {}): Investment {
   };
 }
 
-// ── getAmountInBRL ────────────────────────────────────────────────────────────
+// ── getAmountInUSD ────────────────────────────────────────────────────────────
 
-describe("getAmountInBRL", () => {
-  it("retorna amount direto quando moeda é BRL", () => {
-    const tx = makeTx({ amount: 500, currency: "BRL" });
-    expect(getAmountInBRL(tx)).toBe(500);
+describe("getAmountInUSD", () => {
+  it("retorna amount direto quando moeda é USD", () => {
+    const tx = makeTx({ amount: 500, currency: "USD" });
+    expect(getAmountInUSD(tx)).toBe(500);
   });
 
-  it("converte USD para BRL usando exchangeRate", () => {
-    const tx = makeTx({ amount: 100, currency: "USD", exchangeRate: 5.05 });
-    expect(getAmountInBRL(tx)).toBeCloseTo(505);
+  it("converte BRL para USD usando exchangeRate", () => {
+    const tx = makeTx({ amount: 500, currency: "BRL", exchangeRate: 0.2 });
+    expect(getAmountInUSD(tx)).toBeCloseTo(100);
   });
 
-  it("converte EUR para BRL usando exchangeRate", () => {
-    const tx = makeTx({ amount: 100, currency: "EUR", exchangeRate: 5.5 });
-    expect(getAmountInBRL(tx)).toBeCloseTo(550);
+  it("converte EUR para USD usando exchangeRate", () => {
+    const tx = makeTx({ amount: 100, currency: "EUR", exchangeRate: 1.08 });
+    expect(getAmountInUSD(tx)).toBeCloseTo(108);
   });
 
   it("usa exchangeRate=1 quando zero (fallback)", () => {
-    const tx = makeTx({ amount: 200, currency: "USD", exchangeRate: 0 });
-    expect(getAmountInBRL(tx)).toBe(200);
+    const tx = makeTx({ amount: 200, currency: "BRL", exchangeRate: 0 });
+    expect(getAmountInUSD(tx)).toBe(200);
   });
 });
 
@@ -115,9 +115,9 @@ describe("calcTotalExpenses", () => {
 
   it("inclui conversão de moeda estrangeira", () => {
     const txs = [
-      makeTx({ type: "Gasto", amount: 100, currency: "USD", exchangeRate: 5 }),
+      makeTx({ type: "Gasto", amount: 500, currency: "BRL", exchangeRate: 0.2 }),
     ];
-    expect(calcTotalExpenses(txs)).toBe(500);
+    expect(calcTotalExpenses(txs)).toBe(100);
   });
 });
 
@@ -301,7 +301,7 @@ describe("txMonthKey", () => {
 describe("formatMonthLabel", () => {
   it("formata chave YYYY-MM para label abreviado", () => {
     expect(formatMonthLabel("2025-01")).toBe("Jan/2025");
-    expect(formatMonthLabel("2025-12")).toBe("Dez/2025");
+    expect(formatMonthLabel("2025-12")).toBe("Dec/2025");
     expect(formatMonthLabel("2025-06")).toBe("Jun/2025");
   });
 });

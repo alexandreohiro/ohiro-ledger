@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Transaction } from "@/lib/types";
 import {
   formatCurrency,
-  getAmountInBRL,
+  getAmountInUSD,
   groupByCategory,
   buildMonthlyChartData,
   formatMonthLabel,
@@ -54,7 +54,7 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
     () => monthTransactions.filter((t) => (mode === "gastos" ? t.type === "Gasto" : t.type === "Receita")),
     [monthTransactions, mode]
   );
-  const total = useMemo(() => filtered.reduce((s, t) => s + getAmountInBRL(t), 0), [filtered]);
+  const total = useMemo(() => filtered.reduce((s, t) => s + getAmountInUSD(t), 0), [filtered]);
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
   // Total acumulado de todos os meses (para comparação)
@@ -62,7 +62,7 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
     () => transactions.filter((t) => (mode === "gastos" ? t.type === "Gasto" : t.type === "Receita")),
     [transactions, mode]
   );
-  const totalAll = useMemo(() => allFiltered.reduce((s, t) => s + getAmountInBRL(t), 0), [allFiltered]);
+  const totalAll = useMemo(() => allFiltered.reduce((s, t) => s + getAmountInUSD(t), 0), [allFiltered]);
 
   // Dados históricos para o gráfico
   const monthlyData = useMemo(
@@ -145,12 +145,12 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {Object.entries(grouped)
             .sort(([, a], [, b]) => {
-              const totA = a.reduce((s, t) => s + getAmountInBRL(t), 0);
-              const totB = b.reduce((s, t) => s + getAmountInBRL(t), 0);
+              const totA = a.reduce((s, t) => s + getAmountInUSD(t), 0);
+              const totB = b.reduce((s, t) => s + getAmountInUSD(t), 0);
               return totB - totA;
             })
             .map(([cat, txns]) => {
-              const catTotal = txns.reduce((s, t) => s + getAmountInBRL(t), 0);
+              const catTotal = txns.reduce((s, t) => s + getAmountInUSD(t), 0);
               const pct = total > 0 ? (catTotal / total) * 100 : 0;
               return (
                 <div key={cat} className="rounded-lg border border-border/40 bg-card/60 p-4">
@@ -163,7 +163,7 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
                   <div className="text-[10px] font-mono text-muted-foreground mb-3">{pct.toFixed(1)}% do total do mês</div>
                   <div className="flex flex-col gap-1.5 border-t border-border/20 pt-2">
                     {txns
-                      .sort((a, b) => getAmountInBRL(b) - getAmountInBRL(a))
+                      .sort((a, b) => getAmountInUSD(b) - getAmountInUSD(a))
                       .map((t) => (
                         <div key={t.id} className="flex items-center justify-between text-[11px] font-mono">
                           <div className="min-w-0 mr-2">
@@ -172,7 +172,7 @@ export function ExpensesRevenuesView({ transactions, monthTransactions, selected
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <StatusBadge status={t.status} />
-                            <span className={cn("font-bold", color)}>{formatCurrency(getAmountInBRL(t))}</span>
+                            <span className={cn("font-bold", color)}>{formatCurrency(getAmountInUSD(t))}</span>
                           </div>
                         </div>
                       ))}
