@@ -12,7 +12,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "migrate": "node --env-file-if-exists=.env.development.local scripts/migrate.mjs"
+    "migrate": "node --env-file-if-exists=.env.development.local scripts/migrate.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.85",
@@ -23,7 +26,6 @@
     "@base-ui/react": "^1.5.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
-    "@vercel/analytics": "1.6.1",
     "ai": "^6.0.208",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -41,6 +43,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.11",
     "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -54,7 +57,8 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "typescript": "5.7.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wrangler": "^4.103.0"
   },
   "pnpm": {
     "overrides": {

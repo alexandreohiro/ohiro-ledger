@@ -21,3 +21,8 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Cloudflare (OpenNext / Wrangler)
+.open-next/
+.wrangler/
+.dev.vars
