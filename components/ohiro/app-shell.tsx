@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ActiveView, Transaction, Investment, Debt, Account } from "@/lib/types";
 import {
@@ -35,6 +35,7 @@ import {
   updateBankAccount,
   deleteBankAccount,
   signOut,
+  type UserPreferences,
 } from "@/lib/actions";
 import type { Notification } from "@/lib/notification-actions";
 import { createClient } from "@/lib/supabase/client";
@@ -49,6 +50,16 @@ interface AppShellProps {
   initialNotifications: Notification[];
   initialNotificationDays: number;
   initialAiConsent: boolean;
+  initialPreferences: UserPreferences;
+}
+
+/** Aplica as classes de tema no <html>, espelhando a lógica do script inline em layout.tsx. */
+function applyThemeClasses(mode: UserPreferences["themeMode"], palette: UserPreferences["themePalette"]) {
+  const isDark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const root = document.documentElement;
+  root.classList.toggle("dark", isDark);
+  root.classList.toggle("light", !isDark);
+  root.classList.toggle("theme-vscode", palette === "vscode-terminal");
 }
 
 export function AppShell({
@@ -60,7 +71,16 @@ export function AppShell({
   initialNotifications,
   initialNotificationDays,
   initialAiConsent,
+  initialPreferences,
 }: AppShellProps) {
+  // Aplica a preferência real (persistida no Supabase) após hidratação,
+  // sobrescrevendo o "palpite" do script inline baseado em localStorage
+  // (cobre o caso de o usuário ter mudado o tema em outro dispositivo).
+  useEffect(() => {
+    localStorage.setItem("ohiro-theme-mode", initialPreferences.themeMode);
+    localStorage.setItem("ohiro-theme-palette", initialPreferences.themePalette);
+    applyThemeClasses(initialPreferences.themeMode, initialPreferences.themePalette);
+  }, [initialPreferences.themeMode, initialPreferences.themePalette]);
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [usdRate, setUsdRate] = useState(5.05);
@@ -370,6 +390,15 @@ export function AppShell({
               onResetData={handleResetData}
               initialNotificationDays={initialNotificationDays}
               initialAiConsent={initialAiConsent}
+              initialPreferences={initialPreferences}
+              onPreferencesChange={(prefs) => {
+                if (prefs.themeMode) localStorage.setItem("ohiro-theme-mode", prefs.themeMode);
+                if (prefs.themePalette) localStorage.setItem("ohiro-theme-palette", prefs.themePalette);
+                applyThemeClasses(
+                  prefs.themeMode ?? initialPreferences.themeMode,
+                  prefs.themePalette ?? initialPreferences.themePalette,
+                );
+              }}
             />
           )}
         </main>

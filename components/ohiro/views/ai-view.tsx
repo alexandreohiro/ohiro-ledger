@@ -9,7 +9,7 @@ import {
   type DragEvent,
 } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { Transaction, Investment, Debt } from "@/lib/types";
 import { calcFinancialSummary, formatCurrency } from "@/lib/calculations";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,10 @@ import {
   Cpu,
   Activity,
   Info,
+  History,
+  Plus,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -201,6 +205,110 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     refreshCreditBalances();
   }, [refreshCreditBalances]);
 
+  // ── Sessões de chat (persistência via Supabase) ─────────────────────────────
+  interface AiSession { id: string; title: string; updatedAt: string }
+  const [sessions, setSessions] = useState<AiSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+  const [showSessionPanel, setShowSessionPanel] = useState(false);
+  const [sessionsReady, setSessionsReady] = useState(false);
+
+  const loadSessionMessages = useCallback(async (sessionId: string) => {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("ai_messages")
+      .select("id, role, parts")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true })
+      .limit(500);
+    setInitialMessages((data ?? []) as UIMessage[]);
+  }, []);
+
+  // Carrega a lista de sessões ao montar; cria uma nova se o usuário nunca conversou.
+  useEffect(() => {
+    (async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("ai_sessions")
+        .select("id, title, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(100);
+
+      let list: AiSession[] = (data ?? []).map((r) => ({ id: r.id, title: r.title, updatedAt: r.updated_at }));
+
+      if (list.length === 0) {
+        const { data: created } = await supabase
+          .from("ai_sessions")
+          .insert({ title: "New conversation" })
+          .select("id, title, updated_at")
+          .single();
+        if (created) list = [{ id: created.id, title: created.title, updatedAt: created.updated_at }];
+      }
+
+      setSessions(list);
+      const first = list[0];
+      if (first) {
+        await loadSessionMessages(first.id);
+        setActiveSessionId(first.id);
+      }
+      setSessionsReady(true);
+    })();
+  }, [loadSessionMessages]);
+
+  async function handleNewSession() {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data: created } = await supabase
+      .from("ai_sessions")
+      .insert({ title: "New conversation" })
+      .select("id, title, updated_at")
+      .single();
+    if (!created) return;
+    setSessions((prev) => [{ id: created.id, title: created.title, updatedAt: created.updated_at }, ...prev]);
+    setInitialMessages([]);
+    setActiveSessionId(created.id);
+    setShowSessionPanel(false);
+  }
+
+  async function handleSwitchSession(sessionId: string) {
+    if (sessionId === activeSessionId) {
+      setShowSessionPanel(false);
+      return;
+    }
+    await loadSessionMessages(sessionId);
+    setActiveSessionId(sessionId);
+    setShowSessionPanel(false);
+  }
+
+  async function handleDeleteSession(sessionId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    await supabase.from("ai_sessions").delete().eq("id", sessionId);
+    const remaining = sessions.filter((s) => s.id !== sessionId);
+    setSessions(remaining);
+    if (sessionId === activeSessionId) {
+      if (remaining.length > 0) {
+        await loadSessionMessages(remaining[0].id);
+        setActiveSessionId(remaining[0].id);
+      } else {
+        await handleNewSession();
+      }
+    }
+  }
+
+  async function handleRenameSession(sessionId: string, title: string) {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    await supabase.from("ai_sessions").update({ title }).eq("id", sessionId);
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, title } : s)));
+  }
+
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+
   const financialContext = buildFinancialContext(transactions, investments, debts);
 
   // Ref para capturar os arquivos pendentes no momento do envio
@@ -219,6 +327,8 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   const [apiError, setApiError] = useState<string | null>(null);
 
   const { messages, sendMessage, status, stop, regenerate } = useChat({
+    id: activeSessionId ?? undefined,
+    messages: initialMessages,
     transport: new DefaultChatTransport({
       api: "/api/ai/chat",
       prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
@@ -227,6 +337,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           messages: msgs,
           context: financialContextRef.current,
           provider: selectedProviderRef.current,
+          sessionId: activeSessionIdRef.current,
           files: pendingFilesRef.current.map((f) => ({
             name: f.name,
             type: f.type,
@@ -385,6 +496,11 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
     sendMessage({ text: msgText });
 
+    // Renomeia a sessão com a primeira mensagem do usuário, em vez de ficar "New conversation"
+    if (messages.length === 0 && activeSessionId) {
+      handleRenameSession(activeSessionId, msgText.slice(0, 60));
+    }
+
     // Registra +1 requisição local para o provider selecionado
     recordUsage(selectedProvider);
     setTodayUsage(getTodayUsage());
@@ -455,6 +571,21 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
+          {/* Botão de sessões de chat */}
+          <button
+            onClick={() => setShowSessionPanel((v) => !v)}
+            className={cn(
+              "flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-md border transition-all",
+              showSessionPanel
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
+            )}
+            aria-label="Chat sessions"
+          >
+            <History className="size-3 shrink-0" />
+            <span className="hidden sm:inline">Conversations</span>
+          </button>
+
           {needsRefresh && (
             <button
               onClick={() => window.location.reload()}
@@ -533,6 +664,19 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Painel de sessões de chat */}
+      {showSessionPanel && (
+        <SessionPanel
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelect={handleSwitchSession}
+          onNew={handleNewSession}
+          onDelete={handleDeleteSession}
+          onRename={handleRenameSession}
+          onClose={() => setShowSessionPanel(false)}
+        />
+      )}
 
       {/* Painel de seleção de provider */}
       {showProviderPanel && (
@@ -811,6 +955,113 @@ interface ProviderPanelProps {
   creditBalances: Partial<Record<ProviderId, number>>;
   onSelect: (id: ProviderId) => void;
   onClose: () => void;
+}
+
+interface SessionPanelProps {
+  sessions: { id: string; title: string; updatedAt: string }[];
+  activeSessionId: string | null;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
+  onRename: (id: string, title: string) => void;
+  onClose: () => void;
+}
+
+function SessionPanel({ sessions, activeSessionId, onSelect, onNew, onDelete, onRename, onClose }: SessionPanelProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  return (
+    <div className="shrink-0 border-b border-border/40 bg-card/50 backdrop-blur-sm px-4 py-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <History className="size-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-mono font-semibold text-foreground tracking-wide">
+            CONVERSATIONS
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onNew}
+            className="flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            <Plus className="size-3" />
+            New
+          </button>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground/60 hover:text-foreground transition-colors"
+            aria-label="Close panel"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+        {sessions.length === 0 && (
+          <p className="text-[11px] font-mono text-muted-foreground/60 px-2 py-3">No conversations yet.</p>
+        )}
+        {sessions.map((s) => {
+          const isActive = s.id === activeSessionId;
+          const isEditing = editingId === s.id;
+          return (
+            <div
+              key={s.id}
+              onClick={() => !isEditing && onSelect(s.id)}
+              className={cn(
+                "flex items-center gap-2 px-2.5 py-2 rounded-md border text-left transition-all cursor-pointer group",
+                isActive
+                  ? "border-primary/50 bg-primary/8"
+                  : "border-transparent hover:border-border/50 hover:bg-card/60"
+              )}
+            >
+              {isEditing ? (
+                <input
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onRename(s.id, editValue.trim() || s.title);
+                      setEditingId(null);
+                    } else if (e.key === "Escape") {
+                      setEditingId(null);
+                    }
+                  }}
+                  onBlur={() => setEditingId(null)}
+                  className="flex-1 text-[11px] font-mono bg-transparent border-b border-border/40 outline-none text-foreground"
+                />
+              ) : (
+                <span className={cn("flex-1 text-[11px] font-mono truncate", isActive ? "text-primary" : "text-foreground/80")}>
+                  {s.title}
+                </span>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingId(s.id);
+                  setEditValue(s.title);
+                }}
+                className="opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-foreground transition-opacity"
+                aria-label="Rename conversation"
+              >
+                <Pencil className="size-3" />
+              </button>
+              <button
+                onClick={(e) => onDelete(s.id, e)}
+                className="opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-destructive transition-opacity"
+                aria-label="Delete conversation"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSelect, onClose }: ProviderPanelProps) {

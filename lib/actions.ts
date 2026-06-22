@@ -431,3 +431,52 @@ export async function getAiConsent(): Promise<boolean> {
   if (error) return false
   return data?.ai_consent ?? false
 }
+
+// ─── Preferências de tema e idioma ────────────────────────────────────────────
+
+export interface UserPreferences {
+  themeMode: 'dark' | 'light' | 'system'
+  themePalette: 'military' | 'vscode-terminal'
+  aiLanguage: 'pt-BR' | 'en' | 'system'
+}
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  themeMode: 'dark',
+  themePalette: 'military',
+  aiLanguage: 'system',
+}
+
+export async function getUserPreferences(): Promise<UserPreferences> {
+  const { supabase, user } = await requireUser()
+
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('theme_mode, theme_palette, ai_language')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  // Falha aberta: schema desatualizado não deve derrubar a página /app.
+  if (error || !data) return DEFAULT_PREFERENCES
+  return {
+    themeMode: data.theme_mode ?? DEFAULT_PREFERENCES.themeMode,
+    themePalette: data.theme_palette ?? DEFAULT_PREFERENCES.themePalette,
+    aiLanguage: data.ai_language ?? DEFAULT_PREFERENCES.aiLanguage,
+  }
+}
+
+export async function saveUserPreferences(prefs: Partial<UserPreferences>): Promise<void> {
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
+
+  const update: Record<string, string> = {}
+  if (prefs.themeMode) update.theme_mode = prefs.themeMode
+  if (prefs.themePalette) update.theme_palette = prefs.themePalette
+  if (prefs.aiLanguage) update.ai_language = prefs.aiLanguage
+
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: user.id, ...update }, { onConflict: 'user_id' })
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/app')
+}

@@ -1,24 +1,70 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield, Database, RefreshCw, Cloud, Bell, Minus, Plus, CheckCircle2, Download, Trash2, ExternalLink, BrainCircuit, ToggleLeft, ToggleRight } from "lucide-react";
+import { Shield, Database, RefreshCw, Cloud, Bell, Minus, Plus, CheckCircle2, Download, Trash2, ExternalLink, BrainCircuit, ToggleLeft, ToggleRight, Palette, Languages, Eraser } from "lucide-react";
 import { saveUserSettings } from "@/lib/notification-actions";
-import { exportUserData, deleteAccount, saveAiConsent } from "@/lib/actions";
+import { exportUserData, deleteAccount, saveAiConsent, saveUserPreferences, type UserPreferences } from "@/lib/actions";
+import { getUserMemory, clearUserMemory, type MemoryFact } from "@/lib/ai-actions";
 import { toast } from "sonner";
 
 interface SettingsViewProps {
   onResetData: () => void;
   initialNotificationDays?: number;
   initialAiConsent?: boolean;
+  initialPreferences?: UserPreferences;
+  onPreferencesChange?: (prefs: Partial<UserPreferences>) => void;
 }
 
-export function SettingsView({ onResetData, initialNotificationDays = 3, initialAiConsent = false }: SettingsViewProps) {
+const DEFAULT_PREFS: UserPreferences = { themeMode: "dark", themePalette: "military", aiLanguage: "system" };
+
+export function SettingsView({
+  onResetData,
+  initialNotificationDays = 3,
+  initialAiConsent = false,
+  initialPreferences = DEFAULT_PREFS,
+  onPreferencesChange,
+}: SettingsViewProps) {
   const [days, setDays] = useState(initialNotificationDays);
   const [saved, setSaved] = useState(false);
   const [aiConsent, setAiConsent] = useState(initialAiConsent);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
+  const [memory, setMemory] = useState<MemoryFact[]>([]);
+  const [memoryLoaded, setMemoryLoaded] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    getUserMemory()
+      .then(setMemory)
+      .catch(() => {})
+      .finally(() => setMemoryLoaded(true));
+  }, []);
+
+  function handleClearMemory() {
+    startTransition(async () => {
+      try {
+        await clearUserMemory();
+        setMemory([]);
+        toast.success("AI memory cleared");
+      } catch {
+        toast.error("Error clearing memory");
+      }
+    });
+  }
+
+  function handlePreferenceChange(patch: Partial<UserPreferences>) {
+    const next = { ...preferences, ...patch };
+    setPreferences(next);
+    onPreferencesChange?.(patch);
+    startTransition(async () => {
+      try {
+        await saveUserPreferences(patch);
+      } catch {
+        toast.error("Error saving preferences");
+      }
+    });
+  }
 
   function handleSave() {
     startTransition(async () => {
@@ -121,6 +167,131 @@ export function SettingsView({ onResetData, initialNotificationDays = 3, initial
             <span className="text-foreground font-bold">Next.js 16 + Supabase</span>
           </div>
         </div>
+      </div>
+
+      {/* Appearance — theme & palette */}
+      <div className="rounded-lg border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <Palette className="size-5 text-primary" />
+          <span className="text-sm font-mono font-semibold text-foreground">
+            Appearance
+          </span>
+        </div>
+        <div className="flex flex-col gap-4">
+          <div>
+            <span className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase block mb-2">
+              Theme mode
+            </span>
+            <div className="flex gap-2">
+              {(["dark", "light", "system"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => handlePreferenceChange({ themeMode: mode })}
+                  disabled={isPending}
+                  className={`flex-1 h-8 rounded-md border text-xs font-mono capitalize transition-colors ${
+                    preferences.themeMode === mode
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/50 bg-muted/30 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase block mb-2">
+              Color palette
+            </span>
+            <div className="flex gap-2">
+              {([
+                { value: "military", label: "Military" },
+                { value: "vscode-terminal", label: "VSCode Terminal" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handlePreferenceChange({ themePalette: opt.value })}
+                  disabled={isPending}
+                  className={`flex-1 h-8 rounded-md border text-xs font-mono transition-colors ${
+                    preferences.themePalette === opt.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/50 bg-muted/30 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* AI response language */}
+      <div className="rounded-lg border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <Languages className="size-5 text-primary" />
+          <span className="text-sm font-mono font-semibold text-foreground">
+            AI Response Language
+          </span>
+        </div>
+        <p className="text-xs font-mono text-muted-foreground leading-relaxed mb-4">
+          Choose the language the AI assistant uses to reply. &quot;System&quot; follows your device&apos;s language.
+        </p>
+        <div className="flex gap-2">
+          {([
+            { value: "system", label: "System" },
+            { value: "pt-BR", label: "Português" },
+            { value: "en", label: "English" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handlePreferenceChange({ aiLanguage: opt.value })}
+              disabled={isPending}
+              className={`flex-1 h-8 rounded-md border text-xs font-mono transition-colors ${
+                preferences.aiLanguage === opt.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border/50 bg-muted/30 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* AI memory — fatos lembrados pela IA entre conversas */}
+      <div className="rounded-lg border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <BrainCircuit className="size-5 text-primary" />
+          <span className="text-sm font-mono font-semibold text-foreground">
+            AI Memory
+          </span>
+        </div>
+        <p className="text-xs font-mono text-muted-foreground leading-relaxed mb-4">
+          Facts the AI assistant remembers across conversations to give more relevant answers.
+        </p>
+        {memoryLoaded && memory.length === 0 ? (
+          <p className="text-xs font-mono text-muted-foreground/60 mb-4">No facts saved yet.</p>
+        ) : (
+          <div className="flex flex-col gap-1.5 mb-4">
+            {memory.map((fact) => (
+              <div key={fact.key} className="flex items-baseline gap-2 text-xs font-mono">
+                <span className="text-muted-foreground tracking-wider uppercase text-[10px]">{fact.key}</span>
+                <span className="text-foreground">{fact.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-fit font-mono text-xs"
+          onClick={handleClearMemory}
+          disabled={isPending || memory.length === 0}
+        >
+          <Eraser className="size-3.5" />
+          Clear memory
+        </Button>
       </div>
 
       {/* Notification settings */}

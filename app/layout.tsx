@@ -22,6 +22,19 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
+// Aplica a classe de tema antes do primeiro paint, lendo a preferência salva
+// (localStorage) ou caindo para o tema escuro/militar padrão. Evita flash de
+// tema errado (FOUC) já que a preferência real só chega do Supabase depois da hidratação.
+const THEME_INIT_SCRIPT = `(function(){try{
+  var mode=localStorage.getItem('ohiro-theme-mode')||'dark';
+  var palette=localStorage.getItem('ohiro-theme-palette')||'military';
+  var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  var root=document.documentElement;
+  root.classList.toggle('dark', isDark);
+  root.classList.toggle('light', !isDark);
+  root.classList.toggle('theme-vscode', palette === 'vscode-terminal');
+}catch(e){}})();`
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,6 +42,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-US" className={`${geistSans.variable} ${geistMono.variable} dark bg-background`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
         <Toaster theme="dark" richColors position="bottom-right" />

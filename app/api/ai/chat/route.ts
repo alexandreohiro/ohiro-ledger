@@ -492,6 +492,41 @@ function buildTools(userId: string) {
         }
       },
     }),
+
+    updateMemory: tool({
+      description:
+        "Salva, atualiza ou remove um fato sobre o usuário que deve ser lembrado em conversas futuras (ex: nome, profissão, meta financeira, restrições). Use quando o usuário compartilhar algo relevante e duradouro sobre si mesmo. Não salve dados financeiros sensíveis como senhas, CPF ou número de cartão.",
+      inputSchema: z.object({
+        action: z.enum(["save", "delete"]).describe("'save' para adicionar/atualizar, 'delete' para remover"),
+        key: z.string().describe("Identificador curto do fato, ex: 'nome', 'profissao', 'meta_financeira'"),
+        value: z.string().optional().describe("Valor do fato (obrigatório para action='save')"),
+      }),
+      execute: async (input) => {
+        try {
+          const supabase = await createClient();
+          const { data: existing } = await supabase
+            .from("ai_memory")
+            .select("facts")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          const facts: { key: string; value: string }[] = Array.isArray(existing?.facts) ? existing.facts : [];
+          const filtered = facts.filter((f) => f.key !== input.key);
+          const nextFacts = input.action === "save" && input.value
+            ? [...filtered, { key: input.key, value: sanitizeMessage(input.value, 500) }]
+            : filtered;
+
+          const { error } = await supabase
+            .from("ai_memory")
+            .upsert({ user_id: userId, facts: nextFacts, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+
+          if (error) return { success: false, error: error.message };
+          return { success: true, message: `Memória atualizada: ${input.key}` };
+        } catch (e) {
+          return { success: false, error: String(e) };
+        }
+      },
+    }),
   };
 }
 
@@ -518,6 +553,7 @@ export async function POST(req: Request) {
     context?: string;
     files?: Array<{ name: string; type: string; data: string }>;
     provider?: string;
+    sessionId?: string;
   };
   try {
     body = await req.json();
@@ -525,7 +561,7 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Payload inválido" }), { status: 400 });
   }
 
-  const { messages = [], context = "", files = [], provider: rawProvider = "gemini" } = body;
+  const { messages = [], context = "", files = [], provider: rawProvider = "gemini", sessionId } = body;
   const providerId: ProviderId = (["gemini", "openai", "anthropic", "groq"].includes(rawProvider)
     ? rawProvider
     : "gemini") as ProviderId;
@@ -557,6 +593,19 @@ export async function POST(req: Request) {
   // ── Converte UIMessage[] → ModelMessage[] via SDK (correto para AI SDK 6) ────
   const uiMessages = (messages ?? []) as UIMessage[];
   const modelMessages = await convertToModelMessages(uiMessages);
+
+  // ── Memória de longo prazo + idioma preferido ────────────────────────────────
+  const [{ data: memoryRow }, { data: settingsRow }] = await Promise.all([
+    supabase.from("ai_memory").select("facts").eq("user_id", user.id).maybeSingle(),
+    supabase.from("user_settings").select("ai_language").eq("user_id", user.id).maybeSingle(),
+  ]);
+  const memoryFacts: { key: string; value: string }[] = Array.isArray(memoryRow?.facts) ? memoryRow.facts : [];
+  const aiLanguagePref = settingsRow?.ai_language ?? "system";
+  const responseLanguage = aiLanguagePref === "en"
+    ? "English"
+    : aiLanguagePref === "pt-BR"
+      ? "Portuguese (Brazil)"
+      : null; // "system" → segue o idioma da última mensagem do usuário
 
   // Se há arquivos, injeta na última mensagem do usuário como fileParts
   // @ai-sdk/google aceita Uint8Array (binário) ou string URL — não base64 pura
@@ -597,6 +646,8 @@ export async function POST(req: Request) {
 
 ## CONTEXTO FINANCEIRO ATUAL DO USUÁRIO
 ${sanitizeMessage(context, 5000)}
+${memoryFacts.length > 0 ? `\n## MEMÓRIA DE LONGO PRAZO (fatos salvos sobre o usuário em conversas anteriores)\n${memoryFacts.map((f) => `- ${f.key}: ${f.value}`).join("\n")}\n` : ""}
+${responseLanguage ? `\n## IDIOMA\nResponda SEMPRE em ${responseLanguage}, independentemente do idioma da mensagem do usuário.\n` : ""}
 
 ## TOOLS DISPONÍVEIS E QUANDO USAR
 
@@ -617,8 +668,11 @@ ${sanitizeMessage(context, 5000)}
 ### Exclusão
 - **deleteTransaction**: Remove um lançamento. OBRIGATÓRIO: mostrar ao usuário o lançamento encontrado e pedir confirmação antes de setar confirmed=true.
 
+### Memória
+- **updateMemory**: Use quando o usuário compartilhar um fato duradouro sobre si (nome, profissão, meta financeira, restrições, preferências). Esse fato será lembrado em conversas futuras, mesmo em outra sessão. Nunca salve senhas, CPF ou dados de cartão.
+
 ## COMPORTAMENTO
-- Responda SEMPRE em português do Brasil, linguagem financeira clara e objetiva.
+${responseLanguage ? `- Responda SEMPRE em ${responseLanguage}, linguagem financeira clara e objetiva.` : "- Responda SEMPRE em português do Brasil, linguagem financeira clara e objetiva."}
 - Valores monetários: R$ com vírgula decimal (ex: R$ 1.234,56).
 - Ao receber contracheque (imagem/PDF): extraia salário bruto, todos os descontos (INSS, IR, planos) e salário líquido. Insira cada item com addTransaction após mostrar o resumo ao usuário. Em seguida, SEMPRE chame findMissingRecurringExpenses para o mês do contracheque — se houver contas recorrentes (água, luz, internet, etc.) ausentes nesse mês, avise o usuário explicitamente: "Notei que sua conta de [categoria] (~R$ [valor médio]) aparece nos últimos meses mas não foi lançada em [mês] — você já pagou e esqueceu de registrar, ou ainda está pendente?" e ofereça para adicionar com addTransaction caso o usuário confirme.
 - Ao receber extrato bancário ou fatura: liste todas as transações identificadas, confirme com o usuário e depois insira com addTransaction.
@@ -681,6 +735,30 @@ Investimento: Renda Fixa, CDB, LCI / LCA, Tesouro Direto, Renda Variável, Açõ
 
   try {
     const stream = createUIMessageStream({
+      originalMessages: sessionId ? uiMessages : undefined,
+      onFinish: sessionId
+        ? async ({ messages: finalMessages }) => {
+            // Upsert idempotente: o cliente reenvia o histórico completo a cada turno,
+            // então mensagens já persistidas em turnos anteriores apareceriam de novo aqui.
+            // onConflict por id + ignoreDuplicates evita duplicar linhas já salvas.
+            const rows = finalMessages.map((m) => ({
+              id: m.id,
+              session_id: sessionId,
+              user_id: user.id,
+              role: m.role,
+              parts: m.parts,
+            }));
+            const { error } = await supabase
+              .from("ai_messages")
+              .upsert(rows, { onConflict: "id", ignoreDuplicates: true });
+            if (error) console.error("[ai/chat] persist messages error:", error.message);
+            await supabase
+              .from("ai_sessions")
+              .update({ updated_at: new Date().toISOString() })
+              .eq("id", sessionId)
+              .eq("user_id", user.id);
+          }
+        : undefined,
       execute: async ({ writer }) => {
         for (const candidateId of candidates) {
           const providerDef = getProvider(candidateId);

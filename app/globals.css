@@ -120,47 +120,118 @@
   --risk-critical: 0 68% 54%;
 }
 
-/* Força sempre o tema escuro */
-@media (prefers-color-scheme: light) {
-  :root:not(.light) {
-    color-scheme: dark;
-    --background: oklch(0.13 0.012 152);
-    --foreground: oklch(0.91 0.018 145);
-    --card: oklch(0.17 0.014 148);
-    --card-foreground: oklch(0.89 0.018 143);
-    --popover: oklch(0.17 0.014 148);
-    --popover-foreground: oklch(0.89 0.018 143);
-    --primary: oklch(0.58 0.14 147);
-    --primary-foreground: oklch(0.13 0.012 152);
-    --secondary: oklch(0.24 0.018 148);
-    --secondary-foreground: oklch(0.88 0.016 143);
-    --muted: oklch(0.22 0.014 148);
-    --muted-foreground: oklch(0.66 0.020 143);
-    --accent: oklch(0.64 0.15 149);
-    --accent-foreground: oklch(0.13 0.012 152);
-    --destructive: oklch(0.62 0.19 24);
-    --border: oklch(0.91 0.018 145 / 18%);
-    --input: oklch(0.91 0.018 145 / 22%);
-    --ring: oklch(0.62 0.15 147);
-    --chart-1: oklch(0.64 0.15 149);
-    --chart-2: oklch(0.56 0.12 147);
-    --chart-3: oklch(0.48 0.09 145);
-    --chart-4: oklch(0.40 0.07 144);
-    --chart-5: oklch(0.32 0.05 143);
-    --chart-outros: oklch(0.68 0.17 46);
-    --sidebar: oklch(0.15 0.013 152);
-    --sidebar-foreground: oklch(0.89 0.018 143);
-    --sidebar-primary: oklch(0.58 0.14 147);
-    --sidebar-primary-foreground: oklch(0.13 0.012 152);
-    --sidebar-accent: oklch(0.24 0.018 148);
-    --sidebar-accent-foreground: oklch(0.91 0.018 143);
-    --sidebar-border: oklch(0.91 0.018 145 / 16%);
-    --sidebar-ring: oklch(0.62 0.15 147);
-    --risk-low: 142 52% 44%;
-    --risk-medium: 43 86% 54%;
-    --risk-high: 20 82% 54%;
-    --risk-critical: 0 68% 54%;
-  }
+/* =====================================================
+   OHIRO — TEMA CLARO
+   ===================================================== */
+:root.light {
+  color-scheme: light;
+
+  --background: oklch(0.98 0.004 145);
+  --foreground: oklch(0.20 0.018 152);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.20 0.018 152);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.20 0.018 152);
+
+  --primary: oklch(0.48 0.13 147);
+  --primary-foreground: oklch(0.98 0.004 145);
+
+  --secondary: oklch(0.93 0.012 145);
+  --secondary-foreground: oklch(0.24 0.018 152);
+
+  --muted: oklch(0.94 0.010 145);
+  --muted-foreground: oklch(0.45 0.020 148);
+
+  --accent: oklch(0.52 0.14 149);
+  --accent-foreground: oklch(0.98 0.004 145);
+
+  --destructive: oklch(0.55 0.20 24);
+
+  --border: oklch(0.20 0.018 152 / 12%);
+  --input: oklch(0.20 0.018 152 / 16%);
+  --ring: oklch(0.48 0.13 147);
+
+  --chart-1: oklch(0.48 0.14 149);
+  --chart-2: oklch(0.42 0.12 147);
+  --chart-3: oklch(0.50 0.10 145);
+  --chart-4: oklch(0.40 0.08 144);
+  --chart-5: oklch(0.34 0.06 143);
+  --chart-outros: oklch(0.60 0.18 46);
+
+  --sidebar: oklch(0.96 0.006 145);
+  --sidebar-foreground: oklch(0.22 0.018 152);
+  --sidebar-primary: oklch(0.48 0.13 147);
+  --sidebar-primary-foreground: oklch(0.98 0.004 145);
+  --sidebar-accent: oklch(0.92 0.012 145);
+  --sidebar-accent-foreground: oklch(0.22 0.018 152);
+  --sidebar-border: oklch(0.20 0.018 152 / 10%);
+  --sidebar-ring: oklch(0.48 0.13 147);
+
+  --risk-low: 142 45% 38%;
+  --risk-medium: 38 80% 46%;
+  --risk-high: 18 75% 48%;
+  --risk-critical: 0 65% 48%;
+}
+
+/* =====================================================
+   OHIRO — TEMA "VSCODE TERMINAL"
+   Paleta inspirada no editor/terminal do VSCode (dark+)
+   ===================================================== */
+:root.dark.theme-vscode {
+  color-scheme: dark;
+
+  --background: oklch(0.20 0.006 250);
+  --foreground: oklch(0.88 0.006 240);
+
+  --card: oklch(0.24 0.008 250);
+  --card-foreground: oklch(0.88 0.006 240);
+
+  --popover: oklch(0.22 0.008 250);
+  --popover-foreground: oklch(0.88 0.006 240);
+
+  /* Azul "VSCode blue" */
+  --primary: oklch(0.62 0.14 255);
+  --primary-foreground: oklch(0.16 0.006 250);
+
+  --secondary: oklch(0.30 0.010 250);
+  --secondary-foreground: oklch(0.85 0.006 240);
+
+  --muted: oklch(0.27 0.008 250);
+  --muted-foreground: oklch(0.62 0.012 240);
+
+  /* Ciano terminal */
+  --accent: oklch(0.70 0.11 200);
+  --accent-foreground: oklch(0.16 0.006 250);
+
+  --destructive: oklch(0.62 0.20 18);
+
+  --border: oklch(0.88 0.006 240 / 14%);
+  --input: oklch(0.88 0.006 240 / 18%);
+  --ring: oklch(0.62 0.14 255);
+
+  /* Verde / amarelo / magenta / ciano terminal */
+  --chart-1: oklch(0.70 0.16 145);
+  --chart-2: oklch(0.78 0.15 95);
+  --chart-3: oklch(0.62 0.18 320);
+  --chart-4: oklch(0.70 0.11 200);
+  --chart-5: oklch(0.62 0.14 255);
+  --chart-outros: oklch(0.68 0.18 46);
+
+  --sidebar: oklch(0.17 0.006 250);
+  --sidebar-foreground: oklch(0.85 0.006 240);
+  --sidebar-primary: oklch(0.62 0.14 255);
+  --sidebar-primary-foreground: oklch(0.16 0.006 250);
+  --sidebar-accent: oklch(0.28 0.010 250);
+  --sidebar-accent-foreground: oklch(0.88 0.006 240);
+  --sidebar-border: oklch(0.88 0.006 240 / 12%);
+  --sidebar-ring: oklch(0.62 0.14 255);
+
+  --risk-low: 145 60% 56%;
+  --risk-medium: 95 65% 56%;
+  --risk-high: 18 75% 54%;
+  --risk-critical: 320 60% 56%;
 }
 
 @layer base {
