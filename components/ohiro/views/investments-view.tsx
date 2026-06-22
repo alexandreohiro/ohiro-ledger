@@ -4,10 +4,12 @@ import { useState } from "react";
 import { Investment, InvestmentClass } from "@/lib/types";
 import { formatCurrency } from "@/lib/calculations";
 import { CurrencyBadge } from "../risk-badge";
+import { SummaryCard } from "../summary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Pencil, Globe, TrendingUp } from "lucide-react";
+import { Plus, Trash2, Pencil, Globe, TrendingUp, Wallet, CalendarClock, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -157,9 +159,19 @@ function InvestmentModal({
   );
 }
 
+function CenterLabel({ total }: { total: number }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+      <span className="text-[10px] font-mono text-muted-foreground tracking-widest uppercase">Total</span>
+      <span className="text-lg font-mono font-bold text-foreground">{formatCurrency(total)}</span>
+    </div>
+  );
+}
+
 export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemove, onSetUsdRate }: InvestmentsViewProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editInv, setEditInv] = useState<Investment | null>(null);
+  const [filterClass, setFilterClass] = useState<InvestmentClass | "Todos">("Todos");
 
   const totalBRL = investments.reduce((s, i) => s + i.convertedAmountBRL, 0);
   const totalUSD = investments.filter((i) => i.currency === "USD").reduce((s, i) => s + i.amount, 0);
@@ -169,11 +181,20 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
   investments.forEach((inv) => {
     byClass[inv.class] = (byClass[inv.class] ?? 0) + inv.convertedAmountBRL;
   });
-  const pieData = Object.entries(byClass).map(([name, value]) => ({
-    name,
-    value,
-    color: CLASS_COLORS[name as InvestmentClass] ?? "hsl(0 0% 50%)",
-  }));
+  const pieData = Object.entries(byClass)
+    .map(([name, value]) => ({
+      name,
+      value,
+      color: CLASS_COLORS[name as InvestmentClass] ?? "hsl(0 0% 50%)",
+      pct: totalBRL > 0 ? (value / totalBRL) * 100 : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  const topClass = pieData[0]?.name ?? "—";
+
+  const visibleInvestments = filterClass === "Todos"
+    ? investments
+    : investments.filter((i) => i.class === filterClass);
 
   function handleEdit(inv: Investment) {
     setEditInv(inv);
@@ -189,10 +210,8 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-[1400px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Carteira de Investimentos</div>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Carteira de Investimentos</div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <Globe className="size-3.5 text-muted-foreground" />
@@ -213,100 +232,122 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 rounded-lg border border-[hsl(var(--accent))/20] bg-[hsl(var(--accent))/5]">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Total BRL</div>
-          <div className="text-xl font-mono font-bold text-[hsl(var(--accent))]">{formatCurrency(totalBRL)}</div>
-        </div>
-        <div className="p-4 rounded-lg border border-border/40 bg-card/40">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Total USD</div>
-          <div className="text-xl font-mono font-bold text-foreground">$ {totalUSD.toFixed(2)}</div>
-        </div>
-        <div className="p-4 rounded-lg border border-border/40 bg-card/40">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Aporte mensal</div>
-          <div className="text-xl font-mono font-bold text-foreground">{formatCurrency(monthlyContribution)}</div>
-        </div>
-        <div className="p-4 rounded-lg border border-border/40 bg-card/40">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Ativos</div>
-          <div className="text-xl font-mono font-bold text-foreground">{investments.length}</div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <SummaryCard
+          title="Total em BRL"
+          value={formatCurrency(totalBRL)}
+          icon={Wallet}
+          variant="accent"
+          subtitle="Carteira consolidada"
+        />
+        <SummaryCard
+          title="Exposição USD"
+          value={`$ ${totalUSD.toFixed(2)}`}
+          icon={Globe}
+          subtitle="Ativos em dólar"
+        />
+        <SummaryCard
+          title="Aporte Mensal"
+          value={formatCurrency(monthlyContribution)}
+          icon={CalendarClock}
+          subtitle="Contribuição recorrente"
+        />
+        <SummaryCard
+          title="Classe Dominante"
+          value={topClass}
+          icon={Layers}
+          subtitle={`${investments.length} ativo${investments.length === 1 ? "" : "s"}`}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Pie */}
+        {/* Allocation */}
         {pieData.length > 0 && (
-          <div className="rounded-lg border border-border/40 bg-card/60 p-4">
-            <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-3">Distribuição por Classe</div>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={2} dataKey="value">
-                  {pieData.map((entry, i) => <Cell key={i} fill={entry.color} stroke="transparent" />)}
-                </Pie>
-                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-col gap-1.5 mt-2">
+          <div className="rounded-lg border border-border/40 bg-card/60 p-4 flex flex-col">
+            <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-3">Alocação por Classe</div>
+            <div className="relative">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={62} outerRadius={88} paddingAngle={3} dataKey="value" stroke="transparent">
+                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                </PieChart>
+              </ResponsiveContainer>
+              <CenterLabel total={totalBRL} />
+            </div>
+            <div className="flex flex-col gap-2.5 mt-3">
               {pieData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="size-2 rounded-full" style={{ background: item.color }} />
-                    <span className="font-mono text-muted-foreground">{item.name}</span>
+                <button
+                  key={item.name}
+                  onClick={() => setFilterClass(filterClass === item.name ? "Todos" : item.name as InvestmentClass)}
+                  className={cn(
+                    "flex flex-col gap-1 rounded-md px-2 py-1.5 -mx-2 transition-colors text-left",
+                    filterClass === item.name ? "bg-muted/40" : "hover:bg-muted/20"
+                  )}
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full" style={{ background: item.color }} />
+                      <span className="font-mono text-muted-foreground">{item.name}</span>
+                    </div>
+                    <span className="font-mono text-foreground">{formatCurrency(item.value)}</span>
                   </div>
-                  <span className="font-mono text-foreground">{formatCurrency(item.value)}</span>
-                </div>
+                  <Progress value={item.pct} className="h-1" style={{ "--progress-color": item.color } as React.CSSProperties} />
+                </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Investments list */}
-        <div className={cn("rounded-lg border border-border/40 bg-card/60 overflow-hidden", pieData.length > 0 ? "lg:col-span-2" : "lg:col-span-3")}>
-          <div className="p-4 border-b border-border/40">
-            <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Ativos na Carteira</div>
+        {/* Asset list */}
+        <div className={cn("rounded-lg border border-border/40 bg-card/60 overflow-hidden flex flex-col", pieData.length > 0 ? "lg:col-span-2" : "lg:col-span-3")}>
+          <div className="p-4 border-b border-border/40 flex items-center justify-between">
+            <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">
+              Ativos na Carteira {filterClass !== "Todos" && `· ${filterClass}`}
+            </div>
+            {filterClass !== "Todos" && (
+              <button onClick={() => setFilterClass("Todos")} className="text-[10px] font-mono text-muted-foreground hover:text-foreground underline">
+                limpar filtro
+              </button>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs font-mono">
-              <thead>
-                <tr className="border-b border-border/30 bg-muted/10">
-                  {["Ativo", "Classe", "Saldo", "Moeda", "Cotação", "Em BRL", "Aporte/mês", ""].map((h) => (
-                    <th key={h} className="text-left px-3 py-2 text-[10px] tracking-widest uppercase text-muted-foreground/60 whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {investments.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-10 text-muted-foreground">
-                      <TrendingUp className="size-8 mx-auto mb-2 opacity-20" />
-                      <div>Nenhum investimento cadastrado</div>
-                    </td>
-                  </tr>
-                ) : (
-                  investments.map((inv) => (
-                    <tr key={inv.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
-                      <td className="px-3 py-2.5 font-medium text-foreground">{inv.assetName}</td>
-                      <td className="px-3 py-2.5">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="size-1.5 rounded-full" style={{ background: CLASS_COLORS[inv.class] ?? "currentColor" }} />
-                          <span className="text-muted-foreground">{inv.class}</span>
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-foreground">{inv.currency !== "BRL" ? `${inv.amount.toFixed(2)}` : formatCurrency(inv.amount)}</td>
-                      <td className="px-3 py-2.5"><CurrencyBadge currency={inv.currency} /></td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{inv.currency !== "BRL" ? `R$ ${inv.exchangeRate.toFixed(2)}` : "—"}</td>
-                      <td className="px-3 py-2.5 font-bold text-[hsl(var(--accent))]">{formatCurrency(inv.convertedAmountBRL)}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{formatCurrency(inv.monthlyContribution)}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => handleEdit(inv)} className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors" aria-label="Editar"><Pencil className="size-3.5" /></button>
-                          <button onClick={() => onRemove(inv.id)} className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors" aria-label="Remover"><Trash2 className="size-3.5" /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="flex flex-col divide-y divide-border/20 overflow-y-auto max-h-[420px]">
+            {visibleInvestments.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <TrendingUp className="size-8 mx-auto mb-2 opacity-20" />
+                <div>Nenhum investimento cadastrado</div>
+              </div>
+            ) : (
+              visibleInvestments.map((inv) => {
+                const pctOfTotal = totalBRL > 0 ? (inv.convertedAmountBRL / totalBRL) * 100 : 0;
+                return (
+                  <div key={inv.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/10 transition-colors">
+                    <span className="size-2 rounded-full shrink-0" style={{ background: CLASS_COLORS[inv.class] ?? "currentColor" }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-medium text-foreground truncate">{inv.assetName}</span>
+                        <CurrencyBadge currency={inv.currency} />
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Progress value={pctOfTotal} className="h-1 flex-1" style={{ "--progress-color": CLASS_COLORS[inv.class] } as React.CSSProperties} />
+                        <span className="text-[10px] font-mono text-muted-foreground w-10 text-right">{pctOfTotal.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono text-sm font-bold text-foreground">
+                        {inv.currency !== "BRL" ? inv.amount.toFixed(2) : formatCurrency(inv.amount)}
+                      </div>
+                      <div className="font-mono text-[11px] text-[hsl(var(--accent))]">{formatCurrency(inv.convertedAmountBRL)}</div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => handleEdit(inv)} className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors" aria-label="Editar"><Pencil className="size-3.5" /></button>
+                      <button onClick={() => onRemove(inv.id)} className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors" aria-label="Remover"><Trash2 className="size-3.5" /></button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
