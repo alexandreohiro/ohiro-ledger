@@ -49,7 +49,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
       {/* Bell button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label={`Notificações${unread > 0 ? `, ${unread} não lidas` : ""}`}
+        aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}
         className={cn(
           "relative flex items-center justify-center size-8 rounded-md border transition-colors",
           unread > 0
@@ -80,11 +80,11 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
               <div className="flex items-center gap-2">
                 <Bell className="size-3.5 text-muted-foreground" />
                 <span className="text-xs font-mono font-semibold text-foreground">
-                  Notificações
+                  Notifications
                 </span>
                 {unread > 0 && (
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-destructive/15 text-destructive border border-destructive/20">
-                    {unread} nova{unread !== 1 ? "s" : ""}
+                    {unread} new
                   </span>
                 )}
               </div>
@@ -94,7 +94,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                   className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <CheckCheck className="size-3" />
-                  Marcar todas
+                  Mark all read
                 </button>
               )}
             </div>
@@ -105,7 +105,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <Check className="size-8 text-muted-foreground/30" />
                   <p className="text-xs font-mono text-muted-foreground">
-                    Sem notificações pendentes
+                    No pending notifications
                   </p>
                 </div>
               ) : (
@@ -113,7 +113,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                   {overdueNotifs.length > 0 && (
                     <div className="px-3 pt-2 pb-1">
                       <span className="text-[10px] font-mono text-destructive/70 tracking-widest uppercase">
-                        Vencidas
+                        Overdue
                       </span>
                     </div>
                   )}
@@ -128,7 +128,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                   {dueNotifs.length > 0 && (
                     <div className="px-3 pt-2 pb-1">
                       <span className="text-[10px] font-mono text-yellow-500/70 tracking-widest uppercase">
-                        Vencendo em breve
+                        Due soon
                       </span>
                     </div>
                   )}
@@ -204,7 +204,7 @@ function NotifItem({
           {notif.message}
         </p>
         <p className="text-[10px] font-mono text-muted-foreground/50 mt-1">
-          {new Date(notif.createdAt).toLocaleDateString("pt-BR", {
+          {new Date(notif.createdAt).toLocaleDateString("en-US", {
             day: "2-digit",
             month: "2-digit",
             hour: "2-digit",
@@ -218,7 +218,7 @@ function NotifItem({
           e.stopPropagation();
           onDismiss(notif.id);
         }}
-        aria-label="Dispensar notificação"
+        aria-label="Dismiss notification"
         className="opacity-0 group-hover:opacity-100 flex items-center justify-center size-5 rounded hover:bg-muted/60 text-muted-foreground/60 hover:text-foreground transition-all shrink-0 mt-0.5"
       >
         <X className="size-3" />

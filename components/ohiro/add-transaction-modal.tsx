@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Transaction, TransactionType, TransactionStatus, Currency, RecurrenceType } from "@/lib/types";
+import { TRANSACTION_TYPE_LABEL, TRANSACTION_STATUS_LABEL, RECURRENCE_LABEL, translateCategory } from "@/lib/i18n-labels";
 
 interface AddTransactionModalProps {
   open: boolean;
@@ -16,16 +17,94 @@ interface AddTransactionModalProps {
 
 const TYPES: TransactionType[] = ["Receita", "Gasto", "Dívida", "Investimento", "Transferência", "Reserva"];
 const STATUSES: TransactionStatus[] = ["Previsto", "Pago", "Pendente", "Atrasado", "Recorrente"];
-const CURRENCIES: Currency[] = ["BRL", "USD", "EUR"];
+const CURRENCIES: Currency[] = ["USD", "BRL", "EUR"];
 const RECURRENCES: RecurrenceType[] = ["Mensal", "Semanal", "Anual", "Única", "Nenhuma"];
 
-const CATEGORIES: Record<TransactionType, string[]> = {
-  Receita: ["Salário", "Benefícios", "Adicionais", "Freelance", "Outros"],
-  Gasto: ["Alimentação", "Transporte", "Internet", "Igreja", "Assinaturas", "Saúde", "Educação", "Lazer", "Cartão de Crédito", "Outros"],
-  Dívida: ["Banco", "Cartão", "Empréstimo", "Financiamento", "Outros"],
-  Investimento: ["Renda Fixa", "Renda Variável", "Conta Global", "Cripto", "Reserva de Emergência", "Outros"],
-  Transferência: ["Interna", "Externa", "Outros"],
-  Reserva: ["Emergência", "Objetivo", "Outros"],
+export const CATEGORIES: Record<TransactionType, string[]> = {
+  Receita: [
+    "Salário",
+    "13º Salário",
+    "Férias",
+    "Benefícios",
+    "Vale Refeição",
+    "Vale Transporte",
+    "Adicionais",
+    "Hora Extra",
+    "Bônus",
+    "Freelance",
+    "Aluguel Recebido",
+    "Dividendos",
+    "Pensão Recebida",
+    "Outros",
+  ],
+  Gasto: [
+    "Alimentação",
+    "Supermercado",
+    "Restaurante",
+    "Delivery",
+    "Moradia",
+    "Aluguel",
+    "Condomínio",
+    "IPTU",
+    "Água",
+    "Luz",
+    "Gás",
+    "Internet",
+    "Telefone",
+    "Transporte",
+    "Combustível",
+    "Uber / Táxi",
+    "Estacionamento",
+    "Manutenção Veículo",
+    "Saúde",
+    "Farmácia",
+    "Plano de Saúde",
+    "Dentista",
+    "Educação",
+    "Cursos",
+    "Material Escolar",
+    "Lazer",
+    "Streaming",
+    "Assinaturas",
+    "Roupas",
+    "Beleza",
+    "Academia",
+    "Cartão de Crédito",
+    "Financiamento",
+    "Igreja",
+    "Doações",
+    "Outros",
+  ],
+  Dívida: [
+    "Cartão de Crédito",
+    "Cheque Especial",
+    "Empréstimo Pessoal",
+    "Empréstimo Consignado",
+    "Financiamento Veículo",
+    "Financiamento Imóvel",
+    "Banco",
+    "Crediário",
+    "Pensão Alimentícia",
+    "Outros",
+  ],
+  Investimento: [
+    "Renda Fixa",
+    "CDB",
+    "LCI / LCA",
+    "Tesouro Direto",
+    "Renda Variável",
+    "Ações",
+    "FIIs",
+    "ETF",
+    "Conta Global",
+    "Cripto",
+    "Previdência Privada",
+    "Reserva de Emergência",
+    "Poupança",
+    "Outros",
+  ],
+  Transferência: ["Conta Própria", "Para Terceiros", "Pix Recebido", "Pix Enviado", "TED / DOC", "Outros"],
+  Reserva: ["Emergência", "Viagem", "Compra Planejada", "Reforma", "Educação", "Outros"],
 };
 
 function generateId(): string {
@@ -44,7 +123,7 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
       subcategory: "",
       description: "",
       amount: 0,
-      currency: "BRL",
+      currency: "USD",
       exchangeRate: 1,
       status: "Previsto",
       dueDate: today,
@@ -67,7 +146,7 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
       subcategory: form.subcategory ?? "",
       description: form.description ?? "",
       amount: Number(form.amount) || 0,
-      currency: form.currency as Currency ?? "BRL",
+      currency: form.currency as Currency ?? "USD",
       exchangeRate: Number(form.exchangeRate) || 1,
       status: form.status as TransactionStatus ?? "Previsto",
       dueDate: form.dueDate ?? today,
@@ -84,20 +163,20 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
       <DialogContent className="max-w-lg bg-card border-border/60">
         <DialogHeader>
           <DialogTitle className="font-mono text-sm tracking-wide">
-            {editTransaction ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"}
+            {editTransaction ? "EDIT TRANSACTION" : "NEW TRANSACTION"}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Tipo</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Type</label>
               <Select value={form.type} onValueChange={(v) => { set("type", v); set("category", ""); }}>
                 <SelectTrigger className="h-8 text-xs font-mono">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TYPES.map((t) => <SelectItem key={t} value={t} className="text-xs font-mono">{t}</SelectItem>)}
+                  {TYPES.map((t) => <SelectItem key={t} value={t} className="text-xs font-mono">{TRANSACTION_TYPE_LABEL[t]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -109,26 +188,26 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s} className="text-xs font-mono">{s}</SelectItem>)}
+                  {STATUSES.map((s) => <SelectItem key={s} value={s} className="text-xs font-mono">{TRANSACTION_STATUS_LABEL[s]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Descrição</label>
+            <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Description</label>
             <Input
               className="h-8 text-xs font-mono"
               value={form.description ?? ""}
               onChange={(e) => set("description", e.target.value)}
-              placeholder="Descrição do lançamento"
+              placeholder="Transaction description"
               required
             />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Valor</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Amount</label>
               <Input
                 className="h-8 text-xs font-mono"
                 type="number"
@@ -140,7 +219,7 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Moeda</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Currency</label>
               <Select value={form.currency} onValueChange={(v) => set("currency", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono">
                   <SelectValue />
@@ -150,9 +229,9 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
                 </SelectContent>
               </Select>
             </div>
-            {form.currency !== "BRL" && (
+            {form.currency !== "USD" && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Cotação</label>
+                <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Exchange Rate</label>
                 <Input
                   className="h-8 text-xs font-mono"
                   type="number"
@@ -166,30 +245,30 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Categoria</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Category</label>
               <Select value={form.category} onValueChange={(v) => set("category", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono">
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c} value={c} className="text-xs font-mono">{c}</SelectItem>)}
+                  {categories.map((c) => <SelectItem key={c} value={c} className="text-xs font-mono">{translateCategory(c)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Conta</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Account</label>
               <Input
                 className="h-8 text-xs font-mono"
                 value={form.account ?? ""}
                 onChange={(e) => set("account", e.target.value)}
-                placeholder="Ex: Nubank"
+                placeholder="e.g. Chase"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Data</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Date</label>
               <Input
                 className="h-8 text-xs font-mono"
                 type="date"
@@ -198,7 +277,7 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Vencimento</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Due Date</label>
               <Input
                 className="h-8 text-xs font-mono"
                 type="date"
@@ -207,13 +286,13 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Recorrência</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Recurrence</label>
               <Select value={form.recurrence} onValueChange={(v) => set("recurrence", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {RECURRENCES.map((r) => <SelectItem key={r} value={r} className="text-xs font-mono">{r}</SelectItem>)}
+                  {RECURRENCES.map((r) => <SelectItem key={r} value={r} className="text-xs font-mono">{RECURRENCE_LABEL[r]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -221,10 +300,10 @@ export function AddTransactionModal({ open, onClose, onAdd, editTransaction }: A
 
           <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
             <Button type="button" variant="outline" size="sm" onClick={onClose} className="font-mono text-xs">
-              Cancelar
+              Cancel
             </Button>
             <Button type="submit" size="sm" className="font-mono text-xs">
-              {editTransaction ? "Salvar alterações" : "Adicionar lançamento"}
+              {editTransaction ? "Save changes" : "Add transaction"}
             </Button>
           </div>
         </form>

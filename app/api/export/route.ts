@@ -35,9 +35,14 @@ export async function GET(req: Request) {
 
   if (format === 'csv') {
     const sections = [
-      '## TRANSACOES', toCsv(transactions as unknown as Record<string, unknown>[]),
-      '', '## INVESTIMENTOS', toCsv(investments as unknown as Record<string, unknown>[]),
-      '', '## DIVIDAS', toCsv(debts as unknown as Record<string, unknown>[]),
+      '## TRANSACOES',
+      toCsv(transactions as unknown as Record<string, unknown>[]),
+      '',
+      '## INVESTIMENTOS',
+      toCsv(investments as unknown as Record<string, unknown>[]),
+      '',
+      '## DIVIDAS',
+      toCsv(debts as unknown as Record<string, unknown>[]),
     ].join('\n')
 
     return new Response(sections, {

@@ -25,9 +25,14 @@ export const ALLOWED_EXTENSIONS = new Set([
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 // Máximo de 5 arquivos por request
 export const MAX_FILES_PER_REQUEST = 5;
-// Máximo de mensagens por janela de 1 minuto
-export const RATE_LIMIT_MAX = 15;
+// Janela de 1 minuto
 export const RATE_LIMIT_WINDOW_MS = 60_000;
+// Máximo de requisições por janela — rota de IA
+export const RATE_LIMIT_MAX_AI = 15;
+// Máximo de requisições por janela — actions de mutação
+export const RATE_LIMIT_MAX_ACTION = 60;
+// Retrocompatibilidade
+export const RATE_LIMIT_MAX = RATE_LIMIT_MAX_AI;
 
 // ── Validação de arquivo ───────────────────────────────────────────────────────
 export function validateFileType(mimeType: string, filename: string): boolean {
@@ -53,9 +58,45 @@ export function sanitizeMessage(text: string, maxLength = 4000): string {
     .trim();
 }
 
-// ── Rate limiting compartilhado (tabela Supabase + função atômica) ────────────
-// Substitui o antigo Map em memória, que não sobrevivia a múltiplas instâncias serverless.
-export async function checkRateLimit(
+// ── Rate limiting síncrono em memória (Server Actions / mutations) ────────────
+// Usado pelas Server Actions onde não há overhead de latência adicional aceitável.
+// Em cenários multi-instância, o Map não compartilha estado — suficiente para throttle
+// de boa-fé; a camada RLS do Supabase é a defesa definitiva contra abuso.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Rate limit síncrono para Server Actions.
+ * @param key  identificador único, ex: `action:userId`
+ * @param max  máximo de requisições por janela (default: RATE_LIMIT_MAX_ACTION)
+ */
+export function checkRateLimit(
+  key: string,
+  max = RATE_LIMIT_MAX_ACTION,
+): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: max - 1 };
+  }
+
+  if (entry.count >= max) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  entry.count += 1;
+  return { allowed: true, remaining: max - entry.count };
+}
+
+// ── Rate limiting distribuído via Supabase RPC (rota de IA) ──────────────────
+// Sobrevive a múltiplas instâncias serverless via tabela `rate_limits` + UPSERT atômico.
+// Falha aberta: se houver erro de infraestrutura, permite a requisição.
+/**
+ * @param supabase  cliente Supabase autenticado (server-side)
+ * @param userId    ID do usuário autenticado
+ */
+export async function checkRateLimitSupabase(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ allowed: boolean; remaining: number }> {
@@ -68,7 +109,6 @@ export async function checkRateLimit(
     .single();
 
   if (error || !data) {
-    // Falha aberta: erro de infraestrutura não deve bloquear o usuário legítimo.
     return { allowed: true, remaining: RATE_LIMIT_MAX };
   }
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Investment, InvestmentClass } from "@/lib/types";
 import { formatCurrency } from "@/lib/calculations";
+import { INVESTMENT_CLASS_LABEL } from "@/lib/i18n-labels";
 import { CurrencyBadge } from "../risk-badge";
 import { SummaryCard } from "../summary-card";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ function InvestmentModal({
       assetName: "",
       class: "Renda Fixa",
       amount: 0,
-      currency: "BRL",
+      currency: "USD",
       exchangeRate: usdRate,
       convertedAmountBRL: 0,
       monthlyContribution: 0,
@@ -72,7 +73,7 @@ function InvestmentModal({
         const amt = key === "amount" ? Number(value) : Number(prev.amount) || 0;
         const rate = key === "exchangeRate" ? Number(value) : Number(prev.exchangeRate) || 1;
         const cur = key === "currency" ? value : prev.currency;
-        next.convertedAmountBRL = cur === "BRL" ? amt : amt * rate;
+        next.convertedAmountBRL = cur === "USD" ? amt : amt * rate;
       }
       return next;
     });
@@ -85,7 +86,7 @@ function InvestmentModal({
       assetName: form.assetName ?? "",
       class: form.class as InvestmentClass ?? "Renda Fixa",
       amount: Number(form.amount) || 0,
-      currency: (form.currency ?? "BRL") as "BRL" | "USD" | "EUR",
+      currency: (form.currency ?? "USD") as "BRL" | "USD" | "EUR",
       exchangeRate: Number(form.exchangeRate) || 1,
       convertedAmountBRL: Number(form.convertedAmountBRL) || 0,
       monthlyContribution: Number(form.monthlyContribution) || 0,
@@ -99,59 +100,59 @@ function InvestmentModal({
       <DialogContent className="max-w-md bg-card border-border/60">
         <DialogHeader>
           <DialogTitle className="font-mono text-sm tracking-wide">
-            {editInvestment ? "EDITAR INVESTIMENTO" : "NOVO INVESTIMENTO"}
+            {editInvestment ? "EDIT INVESTMENT" : "NEW INVESTMENT"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Nome do Ativo</label>
+            <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Asset Name</label>
             <Input className="h-8 text-xs font-mono" value={form.assetName ?? ""} onChange={(e) => set("assetName", e.target.value)} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Classe</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Class</label>
               <Select value={form.class} onValueChange={(v) => set("class", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {INVESTMENT_CLASSES.map((c) => <SelectItem key={c} value={c} className="text-xs font-mono">{c}</SelectItem>)}
+                  {INVESTMENT_CLASSES.map((c) => <SelectItem key={c} value={c} className="text-xs font-mono">{INVESTMENT_CLASS_LABEL[c]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Moeda</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Currency</label>
               <Select value={form.currency} onValueChange={(v) => set("currency", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["BRL", "USD", "EUR"].map((c) => <SelectItem key={c} value={c} className="text-xs font-mono">{c}</SelectItem>)}
+                  {["USD", "BRL", "EUR"].map((c) => <SelectItem key={c} value={c} className="text-xs font-mono">{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Saldo</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Balance</label>
               <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.amount ?? ""} onChange={(e) => set("amount", e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Aporte mensal</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Monthly Contribution</label>
               <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.monthlyContribution ?? ""} onChange={(e) => set("monthlyContribution", e.target.value)} />
             </div>
           </div>
-          {form.currency !== "BRL" && (
+          {form.currency !== "USD" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Cotação (BRL)</label>
+                <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Exchange Rate (USD)</label>
                 <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.exchangeRate ?? usdRate} onChange={(e) => set("exchangeRate", e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Convertido BRL</label>
+                <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Converted (USD)</label>
                 <Input className="h-8 text-xs font-mono" readOnly value={formatCurrency(Number(form.convertedAmountBRL) || 0)} />
               </div>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} className="font-mono text-xs">Cancelar</Button>
-            <Button type="submit" size="sm" className="font-mono text-xs">{editInvestment ? "Salvar" : "Adicionar"}</Button>
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="font-mono text-xs">Cancel</Button>
+            <Button type="submit" size="sm" className="font-mono text-xs">{editInvestment ? "Save" : "Add"}</Button>
           </div>
         </form>
       </DialogContent>
@@ -171,7 +172,7 @@ function CenterLabel({ total }: { total: number }) {
 export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemove, onSetUsdRate }: InvestmentsViewProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editInv, setEditInv] = useState<Investment | null>(null);
-  const [filterClass, setFilterClass] = useState<InvestmentClass | "Todos">("Todos");
+  const [filterClass, setFilterClass] = useState<InvestmentClass | "All">("All");
 
   const totalBRL = investments.reduce((s, i) => s + i.convertedAmountBRL, 0);
   const totalUSD = investments.filter((i) => i.currency === "USD").reduce((s, i) => s + i.amount, 0);
@@ -192,7 +193,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
 
   const topClass = pieData[0]?.name ?? "—";
 
-  const visibleInvestments = filterClass === "Todos"
+  const visibleInvestments = filterClass === "All"
     ? investments
     : investments.filter((i) => i.class === filterClass);
 
@@ -211,11 +212,11 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Carteira de Investimentos</div>
+        <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Investment Portfolio</div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <Globe className="size-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-mono text-muted-foreground">USD/BRL</span>
+            <span className="text-[11px] font-mono text-muted-foreground">BRL/USD</span>
             <Input
               type="number"
               step="0.01"
@@ -226,7 +227,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
           </div>
           <Button size="sm" onClick={() => setModalOpen(true)} className="font-mono text-xs h-8">
             <Plus className="size-3.5" data-icon="inline-start" />
-            Investimento
+            Investment
           </Button>
         </div>
       </div>
@@ -234,29 +235,29 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard
-          title="Total em BRL"
+          title="Total (USD)"
           value={formatCurrency(totalBRL)}
           icon={Wallet}
           variant="accent"
-          subtitle="Carteira consolidada"
+          subtitle="Consolidated portfolio"
         />
         <SummaryCard
-          title="Exposição USD"
+          title="USD Exposure"
           value={`$ ${totalUSD.toFixed(2)}`}
           icon={Globe}
-          subtitle="Ativos em dólar"
+          subtitle="USD-denominated assets"
         />
         <SummaryCard
-          title="Aporte Mensal"
+          title="Monthly Contribution"
           value={formatCurrency(monthlyContribution)}
           icon={CalendarClock}
-          subtitle="Contribuição recorrente"
+          subtitle="Recurring contribution"
         />
         <SummaryCard
-          title="Classe Dominante"
-          value={topClass}
+          title="Top Class"
+          value={topClass ? (INVESTMENT_CLASS_LABEL[topClass as InvestmentClass] ?? topClass) : "—"}
           icon={Layers}
-          subtitle={`${investments.length} ativo${investments.length === 1 ? "" : "s"}`}
+          subtitle={`${investments.length} asset${investments.length === 1 ? "" : "s"}`}
         />
       </div>
 
@@ -264,7 +265,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
         {/* Allocation */}
         {pieData.length > 0 && (
           <div className="rounded-lg border border-border/40 bg-card/60 p-4 flex flex-col">
-            <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-3">Alocação por Classe</div>
+            <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase mb-3">Allocation by Class</div>
             <div className="relative">
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -280,7 +281,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
               {pieData.map((item) => (
                 <button
                   key={item.name}
-                  onClick={() => setFilterClass(filterClass === item.name ? "Todos" : item.name as InvestmentClass)}
+                  onClick={() => setFilterClass(filterClass === item.name ? "All" : item.name as InvestmentClass)}
                   className={cn(
                     "flex flex-col gap-1 rounded-md px-2 py-1.5 -mx-2 transition-colors text-left",
                     filterClass === item.name ? "bg-muted/40" : "hover:bg-muted/20"
@@ -289,7 +290,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="size-2 rounded-full" style={{ background: item.color }} />
-                      <span className="font-mono text-muted-foreground">{item.name}</span>
+                      <span className="font-mono text-muted-foreground">{INVESTMENT_CLASS_LABEL[item.name as InvestmentClass] ?? item.name}</span>
                     </div>
                     <span className="font-mono text-foreground">{formatCurrency(item.value)}</span>
                   </div>
@@ -304,11 +305,11 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
         <div className={cn("rounded-lg border border-border/40 bg-card/60 overflow-hidden flex flex-col", pieData.length > 0 ? "lg:col-span-2" : "lg:col-span-3")}>
           <div className="p-4 border-b border-border/40 flex items-center justify-between">
             <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">
-              Ativos na Carteira {filterClass !== "Todos" && `· ${filterClass}`}
+              Portfolio Assets {filterClass !== "All" && `· ${INVESTMENT_CLASS_LABEL[filterClass as InvestmentClass] ?? filterClass}`}
             </div>
-            {filterClass !== "Todos" && (
-              <button onClick={() => setFilterClass("Todos")} className="text-[10px] font-mono text-muted-foreground hover:text-foreground underline">
-                limpar filtro
+            {filterClass !== "All" && (
+              <button onClick={() => setFilterClass("All")} className="text-[10px] font-mono text-muted-foreground hover:text-foreground underline">
+                clear filter
               </button>
             )}
           </div>
@@ -316,7 +317,7 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
             {visibleInvestments.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
                 <TrendingUp className="size-8 mx-auto mb-2 opacity-20" />
-                <div>Nenhum investimento cadastrado</div>
+                <div>No investments yet</div>
               </div>
             ) : (
               visibleInvestments.map((inv) => {
@@ -336,13 +337,13 @@ export function InvestmentsView({ investments, usdRate, onAdd, onUpdate, onRemov
                     </div>
                     <div className="text-right shrink-0">
                       <div className="font-mono text-sm font-bold text-foreground">
-                        {inv.currency !== "BRL" ? inv.amount.toFixed(2) : formatCurrency(inv.amount)}
+                        {inv.currency !== "USD" ? inv.amount.toFixed(2) : formatCurrency(inv.amount)}
                       </div>
                       <div className="font-mono text-[11px] text-[hsl(var(--accent))]">{formatCurrency(inv.convertedAmountBRL)}</div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => handleEdit(inv)} className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors" aria-label="Editar"><Pencil className="size-3.5" /></button>
-                      <button onClick={() => onRemove(inv.id)} className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors" aria-label="Remover"><Trash2 className="size-3.5" /></button>
+                      <button onClick={() => handleEdit(inv)} className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors" aria-label="Edit"><Pencil className="size-3.5" /></button>
+                      <button onClick={() => onRemove(inv.id)} className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors" aria-label="Remove"><Trash2 className="size-3.5" /></button>
                     </div>
                   </div>
                 );

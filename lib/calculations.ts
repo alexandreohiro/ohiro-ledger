@@ -1,32 +1,33 @@
 import { Transaction, Investment, FinancialSummary, RiskLevel } from "./types";
 
-export function getAmountInBRL(transaction: Transaction): number {
-  if (transaction.currency === "BRL") return transaction.amount;
+/** Converte para a moeda base do sistema (USD), usando exchangeRate quando a transação não está em USD. */
+export function getAmountInUSD(transaction: Transaction): number {
+  if (transaction.currency === "USD") return transaction.amount;
   return transaction.amount * (transaction.exchangeRate || 1);
 }
 
 export function calcTotalRevenue(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Receita")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcTotalExpenses(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Gasto")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcTotalDebts(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Dívida")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcTotalInvestments(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.type === "Investimento")
-    .reduce((sum, t) => sum + getAmountInBRL(t), 0);
+    .reduce((sum, t) => sum + getAmountInUSD(t), 0);
 }
 
 export function calcFreeBalance(
@@ -93,8 +94,14 @@ export function calcFinancialSummary(
   };
 }
 
-export function formatCurrency(value: number, currency = "BRL"): string {
-  return new Intl.NumberFormat("pt-BR", {
+const CURRENCY_LOCALE: Record<string, string> = {
+  USD: "en-US",
+  BRL: "pt-BR",
+  EUR: "de-DE",
+};
+
+export function formatCurrency(value: number, currency = "USD"): string {
+  return new Intl.NumberFormat(CURRENCY_LOCALE[currency] ?? "en-US", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
@@ -126,4 +133,75 @@ export function groupByCategory(transactions: Transaction[]): Record<string, Tra
     acc[key].push(t);
     return acc;
   }, {} as Record<string, Transaction[]>);
+}
+
+// ── Month helpers ──────────────────────────────────────────────────────────────
+
+/** Returns "YYYY-MM" key for a transaction date string */
+export function txMonthKey(dateStr: string): string {
+  return dateStr.slice(0, 7);
+}
+
+/** Formats "YYYY-MM" to "Jan/2025" */
+export function formatMonthLabel(key: string): string {
+  const [year, month] = key.split("-");
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${MONTHS[parseInt(month, 10) - 1]}/${year}`;
+}
+
+/** Formats a month index (0-11) + year to "January 2025" */
+export function formatMonthYear(month: number, year: number): string {
+  const MONTHS = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+  return `${MONTHS[month]} ${year}`;
+}
+
+/** Formats a month index to short label */
+export function formatMonthShort(month: number, year: number): string {
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${MONTHS[month]}/${String(year).slice(2)}`;
+}
+
+/** Returns sorted list of unique "YYYY-MM" keys that have transactions */
+export function getAvailableMonths(transactions: Transaction[]): string[] {
+  const keys = new Set(transactions.map((t) => txMonthKey(t.date)));
+  return Array.from(keys).sort();
+}
+
+/** Filters transactions to a specific month+year */
+export function filterByMonth(transactions: Transaction[], month: number, year: number): Transaction[] {
+  const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+  return transactions.filter((t) => txMonthKey(t.date) === key);
+}
+
+/** Builds monthly chart data (last N months or all available) */
+export interface MonthlyChartPoint {
+  label: string;
+  key: string;
+  receita: number;
+  gastos: number;
+  dividas: number;
+  investimentos: number;
+  saldo: number;
+}
+
+export function buildMonthlyChartData(transactions: Transaction[], limitMonths = 12): MonthlyChartPoint[] {
+  const months = getAvailableMonths(transactions).slice(-limitMonths);
+  return months.map((key) => {
+    const [year, month] = key.split("-").map(Number);
+    const monthTx = transactions.filter((t) => txMonthKey(t.date) === key);
+    const receita = calcTotalRevenue(monthTx);
+    const gastos = calcTotalExpenses(monthTx);
+    const dividas = calcTotalDebts(monthTx);
+    const investimentos = calcTotalInvestments(monthTx);
+    return {
+      label: formatMonthShort(month - 1, year),
+      key,
+      receita,
+      gastos,
+      dividas,
+      investimentos,
+      saldo: receita - gastos - dividas - investimentos,
+    };
+  });
 }

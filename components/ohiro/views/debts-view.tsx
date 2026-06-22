@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Debt, DebtStatus, DebtPriority } from "@/lib/types";
 import { formatCurrency } from "@/lib/calculations";
+import { DEBT_STATUS_LABEL, DEBT_PRIORITY_LABEL } from "@/lib/i18n-labels";
 import { RiskBadge, StatusBadge } from "../risk-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,37 +78,37 @@ function DebtModal({ open, onClose, onSave, editDebt }: {
       <DialogContent className="max-w-md bg-card border-border/60">
         <DialogHeader>
           <DialogTitle className="font-mono text-sm tracking-wide">
-            {editDebt ? "EDITAR DÍVIDA" : "NOVA DÍVIDA"}
+            {editDebt ? "EDIT DEBT" : "NEW DEBT"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Credor / Banco</label>
+            <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Creditor / Bank</label>
             <Input className="h-8 text-xs font-mono" value={form.creditor ?? ""} onChange={(e) => set("creditor", e.target.value)} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Valor original</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Original Amount</label>
               <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.originalAmount ?? ""} onChange={(e) => set("originalAmount", e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Saldo atual</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Current Balance</label>
               <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.currentAmount ?? ""} onChange={(e) => set("currentAmount", e.target.value)} required />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Parcela</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Installment</label>
               <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.installmentAmount ?? ""} onChange={(e) => set("installmentAmount", e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Juros % a.m.</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Interest % p.m.</label>
               <Input className="h-8 text-xs font-mono" type="number" step="0.01" value={form.interestRate ?? ""} onChange={(e) => set("interestRate", e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Vencimento</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Due Date</label>
               <Input className="h-8 text-xs font-mono" type="date" value={form.dueDate ?? today} onChange={(e) => set("dueDate", e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -115,23 +116,23 @@ function DebtModal({ open, onClose, onSave, editDebt }: {
               <Select value={form.status} onValueChange={(v) => set("status", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DEBT_STATUSES.map((s) => <SelectItem key={s} value={s} className="text-xs font-mono">{s}</SelectItem>)}
+                  {DEBT_STATUSES.map((s) => <SelectItem key={s} value={s} className="text-xs font-mono">{DEBT_STATUS_LABEL[s]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Prioridade</label>
+              <label className="text-[11px] font-mono text-muted-foreground tracking-wider uppercase">Priority</label>
               <Select value={form.priority} onValueChange={(v) => set("priority", v)}>
                 <SelectTrigger className="h-8 text-xs font-mono"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DEBT_PRIORITIES.map((p) => <SelectItem key={p} value={p} className="text-xs font-mono">{p}</SelectItem>)}
+                  {DEBT_PRIORITIES.map((p) => <SelectItem key={p} value={p} className="text-xs font-mono">{DEBT_PRIORITY_LABEL[p]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} className="font-mono text-xs">Cancelar</Button>
-            <Button type="submit" size="sm" className="font-mono text-xs">{editDebt ? "Salvar" : "Adicionar"}</Button>
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="font-mono text-xs">Cancel</Button>
+            <Button type="submit" size="sm" className="font-mono text-xs">{editDebt ? "Save" : "Add"}</Button>
           </div>
         </form>
       </DialogContent>
@@ -165,29 +166,29 @@ export function DebtsView({ debts, onAdd, onUpdate, onRemove }: DebtsViewProps) 
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Gestão de Dívidas</div>
+        <div className="text-[11px] font-mono text-muted-foreground/50 tracking-widest uppercase">Debt Management</div>
         <Button size="sm" onClick={() => setModalOpen(true)} className="font-mono text-xs h-8">
           <Plus className="size-3.5" data-icon="inline-start" />
-          Nova dívida
+          New Debt
         </Button>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 rounded-lg border border-[hsl(var(--risk-critical))/20] bg-[hsl(var(--risk-critical))/5]">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Dívida Total</div>
+          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Total Debt</div>
           <div className="text-xl font-mono font-bold text-[hsl(var(--risk-critical))]">{formatCurrency(totalCurrent)}</div>
         </div>
         <div className="p-4 rounded-lg border border-border/40 bg-card/40">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Parcelas/mês</div>
+          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Installments/mo</div>
           <div className="text-xl font-mono font-bold text-foreground">{formatCurrency(totalInstallments)}</div>
         </div>
         <div className="p-4 rounded-lg border border-border/40 bg-card/40">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Dívidas ativas</div>
+          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Active Debts</div>
           <div className="text-xl font-mono font-bold text-foreground">{activeDebts.length}</div>
         </div>
         <div className="p-4 rounded-lg border border-[hsl(var(--risk-high))/20] bg-[hsl(var(--risk-high))/5]">
-          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Críticas / Altas</div>
+          <div className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase mb-1">Critical / High</div>
           <div className="text-xl font-mono font-bold text-[hsl(var(--risk-high))]">{criticalDebts.length}</div>
         </div>
       </div>
@@ -196,13 +197,13 @@ export function DebtsView({ debts, onAdd, onUpdate, onRemove }: DebtsViewProps) 
       <div className="rounded-lg border border-border/40 overflow-hidden bg-card/60">
         <div className="p-4 border-b border-border/40 flex items-center gap-2">
           <AlertTriangle className="size-4 text-[hsl(var(--risk-medium))]" />
-          <span className="text-[11px] font-mono text-muted-foreground/60 tracking-widest uppercase">Plano de Quitação — ordem de prioridade</span>
+          <span className="text-[11px] font-mono text-muted-foreground/60 tracking-widest uppercase">Payoff Plan — priority order</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs font-mono">
             <thead>
               <tr className="border-b border-border/30 bg-muted/10">
-                {["Credor", "Valor original", "Saldo atual", "Parcela", "Vencimento", "Juros %a.m.", "Prioridade", "Status", "Progresso", ""].map((h) => (
+                {["Creditor", "Original Amount", "Current Balance", "Installment", "Due Date", "Interest %p.m.", "Priority", "Status", "Progress", ""].map((h) => (
                   <th key={h} className="text-left px-3 py-2 text-[10px] tracking-widest uppercase text-muted-foreground/60 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -212,7 +213,7 @@ export function DebtsView({ debts, onAdd, onUpdate, onRemove }: DebtsViewProps) 
                 <tr>
                   <td colSpan={10} className="text-center py-12 text-muted-foreground">
                     <CreditCard className="size-8 mx-auto mb-2 opacity-20" />
-                    <div>Nenhuma dívida cadastrada</div>
+                    <div>No debts registered</div>
                   </td>
                 </tr>
               ) : (
@@ -237,13 +238,13 @@ export function DebtsView({ debts, onAdd, onUpdate, onRemove }: DebtsViewProps) 
                       <td className="px-3 py-2.5 min-w-[100px]">
                         <div className="flex flex-col gap-1">
                           <Progress value={progress} className="h-1.5" />
-                          <span className="text-[10px] text-muted-foreground">{progress.toFixed(0)}% pago</span>
+                          <span className="text-[10px] text-muted-foreground">{progress.toFixed(0)}% paid</span>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => handleEdit(d)} className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors" aria-label="Editar"><Pencil className="size-3.5" /></button>
-                          <button onClick={() => onRemove(d.id)} className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors" aria-label="Remover"><Trash2 className="size-3.5" /></button>
+                          <button onClick={() => handleEdit(d)} className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors" aria-label="Edit"><Pencil className="size-3.5" /></button>
+                          <button onClick={() => onRemove(d.id)} className="p-1 rounded hover:bg-[hsl(var(--risk-critical))/15] text-muted-foreground hover:text-[hsl(var(--risk-critical))] transition-colors" aria-label="Remove"><Trash2 className="size-3.5" /></button>
                         </div>
                       </td>
                     </tr>

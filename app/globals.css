@@ -50,106 +50,116 @@
 
 /* =====================================================
    OHIRO — MILITARY FINANCIAL THEME
-   Verde Militar / Preto Esverdeado / Tático
+   Cinza Esverdeado Profundo / Quase-preto / Quase-branco
+   Sem preto (#000) ou branco (#fff) puros — sempre matizados
    ===================================================== */
 :root {
   color-scheme: dark;
 
-  /* Background: preto esverdeado profundo */
-  --background: oklch(0.10 0.015 150);
-  --foreground: oklch(0.90 0.025 140);
+  /* Background: cinza-verde profundo — quase preto, mas nunca puro */
+  --background: oklch(0.13 0.012 152);
+  /* Foreground: off-white esverdeado — nunca branco puro */
+  --foreground: oklch(0.91 0.018 145);
 
-  /* Cards: ligeiramente mais claro, translúcido */
-  --card: oklch(0.14 0.018 145);
-  --card-foreground: oklch(0.88 0.025 140);
+  /* Cards: camada levemente mais clara */
+  --card: oklch(0.17 0.014 148);
+  --card-foreground: oklch(0.89 0.018 143);
 
-  --popover: oklch(0.14 0.018 145);
-  --popover-foreground: oklch(0.88 0.025 140);
+  --popover: oklch(0.17 0.014 148);
+  --popover-foreground: oklch(0.89 0.018 143);
 
-  /* Primary: verde militar */
-  --primary: oklch(0.55 0.13 145);
-  --primary-foreground: oklch(0.10 0.015 150);
+  /* Primary: verde militar médio */
+  --primary: oklch(0.58 0.14 147);
+  --primary-foreground: oklch(0.13 0.012 152);
 
   /* Secondary */
-  --secondary: oklch(0.18 0.022 145);
-  --secondary-foreground: oklch(0.80 0.020 140);
+  --secondary: oklch(0.24 0.018 148);
+  --secondary-foreground: oklch(0.88 0.016 143);
 
   /* Muted */
-  --muted: oklch(0.17 0.018 145);
-  --muted-foreground: oklch(0.55 0.020 140);
+  --muted: oklch(0.22 0.014 148);
+  --muted-foreground: oklch(0.66 0.020 143);
 
-  /* Accent: verde neon tático */
-  --accent: oklch(0.62 0.16 148);
-  --accent-foreground: oklch(0.10 0.015 150);
+  /* Accent: verde neon suave */
+  --accent: oklch(0.64 0.15 149);
+  --accent-foreground: oklch(0.13 0.012 152);
 
   /* Destructive */
-  --destructive: oklch(0.60 0.20 25);
+  --destructive: oklch(0.62 0.19 24);
 
-  /* Borders */
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.55 0.13 145);
+  /* Borders — visíveis o suficiente para demarcar cards/inputs sem perder a sutileza */
+  --border: oklch(0.91 0.018 145 / 18%);
+  --input: oklch(0.91 0.018 145 / 22%);
+  --ring: oklch(0.62 0.15 147);
 
-  /* Charts */
-  --chart-1: oklch(0.62 0.16 148);
-  --chart-2: oklch(0.55 0.13 145);
-  --chart-3: oklch(0.48 0.10 145);
-  --chart-4: oklch(0.38 0.08 145);
-  --chart-5: oklch(0.28 0.05 145);
+  /* Charts — verde militar → laranja para "Outros" */
+  --chart-1: oklch(0.64 0.15 149);
+  --chart-2: oklch(0.56 0.12 147);
+  --chart-3: oklch(0.48 0.09 145);
+  --chart-4: oklch(0.40 0.07 144);
+  --chart-5: oklch(0.32 0.05 143);
+  /* Laranja "Outros" */
+  --chart-outros: oklch(0.68 0.17 46);
 
   --radius: 0.5rem;
 
-  /* Sidebar */
-  --sidebar: oklch(0.12 0.018 150);
-  --sidebar-foreground: oklch(0.88 0.025 140);
-  --sidebar-primary: oklch(0.55 0.13 145);
-  --sidebar-primary-foreground: oklch(0.10 0.015 150);
-  --sidebar-accent: oklch(0.18 0.022 145);
-  --sidebar-accent-foreground: oklch(0.88 0.025 140);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.55 0.13 145);
+  /* Sidebar: um toque mais escuro que o background */
+  --sidebar: oklch(0.15 0.013 152);
+  --sidebar-foreground: oklch(0.89 0.018 143);
+  --sidebar-primary: oklch(0.58 0.14 147);
+  --sidebar-primary-foreground: oklch(0.13 0.012 152);
+  --sidebar-accent: oklch(0.24 0.018 148);
+  --sidebar-accent-foreground: oklch(0.91 0.018 143);
+  --sidebar-border: oklch(0.91 0.018 145 / 16%);
+  --sidebar-ring: oklch(0.62 0.15 147);
 
-  /* Custom risk tokens (used as hsl-compatible by CSS) */
-  --risk-low: 142 55% 45%;
-  --risk-medium: 43 90% 55%;
-  --risk-high: 20 85% 55%;
-  --risk-critical: 0 70% 55%;
+  /* Risk tokens */
+  --risk-low: 142 52% 44%;
+  --risk-medium: 43 86% 54%;
+  --risk-high: 20 82% 54%;
+  --risk-critical: 0 68% 54%;
 }
 
-/* Ensure the app always uses dark (military) theme */
+/* Força sempre o tema escuro */
 @media (prefers-color-scheme: light) {
   :root:not(.light) {
     color-scheme: dark;
-    --background: oklch(0.10 0.015 150);
-    --foreground: oklch(0.90 0.025 140);
-    --card: oklch(0.14 0.018 145);
-    --card-foreground: oklch(0.88 0.025 140);
-    --popover: oklch(0.14 0.018 145);
-    --popover-foreground: oklch(0.88 0.025 140);
-    --primary: oklch(0.55 0.13 145);
-    --primary-foreground: oklch(0.10 0.015 150);
-    --secondary: oklch(0.18 0.022 145);
-    --secondary-foreground: oklch(0.80 0.020 140);
-    --muted: oklch(0.17 0.018 145);
-    --muted-foreground: oklch(0.55 0.020 140);
-    --accent: oklch(0.62 0.16 148);
-    --accent-foreground: oklch(0.10 0.015 150);
-    --destructive: oklch(0.60 0.20 25);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 12%);
-    --ring: oklch(0.55 0.13 145);
-    --sidebar: oklch(0.12 0.018 150);
-    --sidebar-foreground: oklch(0.88 0.025 140);
-    --sidebar-primary: oklch(0.55 0.13 145);
-    --sidebar-primary-foreground: oklch(0.10 0.015 150);
-    --sidebar-accent: oklch(0.18 0.022 145);
-    --sidebar-accent-foreground: oklch(0.88 0.025 140);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.55 0.13 145);
-    --risk-low: 142 55% 45%;
-    --risk-medium: 43 90% 55%;
-    --risk-high: 20 85% 55%;
-    --risk-critical: 0 70% 55%;
+    --background: oklch(0.13 0.012 152);
+    --foreground: oklch(0.91 0.018 145);
+    --card: oklch(0.17 0.014 148);
+    --card-foreground: oklch(0.89 0.018 143);
+    --popover: oklch(0.17 0.014 148);
+    --popover-foreground: oklch(0.89 0.018 143);
+    --primary: oklch(0.58 0.14 147);
+    --primary-foreground: oklch(0.13 0.012 152);
+    --secondary: oklch(0.24 0.018 148);
+    --secondary-foreground: oklch(0.88 0.016 143);
+    --muted: oklch(0.22 0.014 148);
+    --muted-foreground: oklch(0.66 0.020 143);
+    --accent: oklch(0.64 0.15 149);
+    --accent-foreground: oklch(0.13 0.012 152);
+    --destructive: oklch(0.62 0.19 24);
+    --border: oklch(0.91 0.018 145 / 18%);
+    --input: oklch(0.91 0.018 145 / 22%);
+    --ring: oklch(0.62 0.15 147);
+    --chart-1: oklch(0.64 0.15 149);
+    --chart-2: oklch(0.56 0.12 147);
+    --chart-3: oklch(0.48 0.09 145);
+    --chart-4: oklch(0.40 0.07 144);
+    --chart-5: oklch(0.32 0.05 143);
+    --chart-outros: oklch(0.68 0.17 46);
+    --sidebar: oklch(0.15 0.013 152);
+    --sidebar-foreground: oklch(0.89 0.018 143);
+    --sidebar-primary: oklch(0.58 0.14 147);
+    --sidebar-primary-foreground: oklch(0.13 0.012 152);
+    --sidebar-accent: oklch(0.24 0.018 148);
+    --sidebar-accent-foreground: oklch(0.91 0.018 143);
+    --sidebar-border: oklch(0.91 0.018 145 / 16%);
+    --sidebar-ring: oklch(0.62 0.15 147);
+    --risk-low: 142 52% 44%;
+    --risk-medium: 43 86% 54%;
+    --risk-high: 20 82% 54%;
+    --risk-critical: 0 68% 54%;
   }
 }
 

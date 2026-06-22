@@ -28,7 +28,7 @@ export default function LoginPage() {
       router.push('/app')
       router.refresh()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao autenticar')
+      setError(err instanceof Error ? err.message : 'Authentication error')
     } finally {
       setIsLoading(false)
     }
@@ -47,7 +47,7 @@ export default function LoginPage() {
               Ohiro
             </h1>
             <p className="text-xs text-muted-foreground font-mono tracking-wider mt-1">
-              SISTEMA FINANCEIRO TÁTICO
+              TACTICAL FINANCIAL SYSTEM
             </p>
           </div>
         </div>
@@ -56,10 +56,10 @@ export default function LoginPage() {
         <div className="rounded-xl border border-border bg-card p-6 flex flex-col gap-5">
           <div>
             <h2 className="font-mono text-sm font-semibold uppercase tracking-widest text-foreground">
-              Autenticação
+              Authentication
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Insira suas credenciais para acessar o sistema
+              Enter your credentials to access the system
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="usuario@exemplo.com"
+                placeholder="user@example.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -81,7 +81,7 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password" className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                Senha
+                Password
               </Label>
               <Input
                 id="password"
@@ -104,21 +104,21 @@ export default function LoginPage() {
               className="w-full font-mono uppercase tracking-widest text-xs"
               disabled={isLoading}
             >
-              {isLoading ? 'Autenticando...' : 'Entrar'}
+              {isLoading ? 'Authenticating...' : 'Sign In'}
             </Button>
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
-            Sem conta?{' '}
+            No account?{' '}
             <Link href="/auth/sign-up" className="text-primary hover:underline font-mono">
-              Criar acesso
+              Create access
             </Link>
           </p>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
           <Link href="/privacidade" className="text-primary hover:underline font-mono">
-            Política de Privacidade
+            Privacy Policy
           </Link>
         </p>
       </div>

@@ -2,6 +2,7 @@
 
 import { RiskLevel } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { RISK_LEVEL_LABEL, TRANSACTION_STATUS_LABEL, DEBT_STATUS_LABEL } from "@/lib/i18n-labels";
 
 interface RiskBadgeProps {
   level: RiskLevel;
@@ -11,19 +12,19 @@ interface RiskBadgeProps {
 
 const riskConfig: Record<RiskLevel, { label: string; className: string }> = {
   Baixo: {
-    label: "BAIXO",
+    label: RISK_LEVEL_LABEL["Baixo"].toUpperCase(),
     className: "text-[hsl(var(--risk-low))] border-[hsl(var(--risk-low))/30] bg-[hsl(var(--risk-low))/10]",
   },
   Médio: {
-    label: "MÉDIO",
+    label: RISK_LEVEL_LABEL["Médio"].toUpperCase(),
     className: "text-[hsl(var(--risk-medium))] border-[hsl(var(--risk-medium))/30] bg-[hsl(var(--risk-medium))/10]",
   },
   Alto: {
-    label: "ALTO",
+    label: RISK_LEVEL_LABEL["Alto"].toUpperCase(),
     className: "text-[hsl(var(--risk-high))] border-[hsl(var(--risk-high))/30] bg-[hsl(var(--risk-high))/10]",
   },
   Crítico: {
-    label: "CRÍTICO",
+    label: RISK_LEVEL_LABEL["Crítico"].toUpperCase(),
     className: "text-[hsl(var(--risk-critical))] border-[hsl(var(--risk-critical))/30] bg-[hsl(var(--risk-critical))/10]",
   },
 };
@@ -76,6 +77,13 @@ const statusConfig: Record<string, string> = {
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   const className = statusConfig[status] ?? "text-muted-foreground border-border bg-muted/30";
+  // `status` is a raw PT enum value (TransactionStatus or DebtStatus) used as the
+  // statusConfig lookup key — keep it untranslated for the lookup, but translate
+  // for display via the combined label maps with a fallback to the raw value.
+  const label =
+    (TRANSACTION_STATUS_LABEL as Record<string, string>)[status] ??
+    (DEBT_STATUS_LABEL as Record<string, string>)[status] ??
+    status;
   return (
     <span
       className={cn(
@@ -83,7 +91,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         className
       )}
     >
-      {status}
+      {label}
     </span>
   );
 }

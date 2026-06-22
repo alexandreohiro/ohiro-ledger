@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 interface TopbarProps {
@@ -32,19 +32,22 @@ interface TopbarProps {
   onSignOut?: () => void;
   isPending?: boolean;
   notifications?: Notification[];
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  availableMonthsCount?: number;
   className?: string;
 }
 
 const viewLabels: Record<string, string> = {
-  dashboard: "PAINEL ESTRATÉGICO",
-  ledger: "LEDGER OPERACIONAL",
-  gastos: "CONTROLE DE GASTOS",
-  receitas: "FLUXO DE RECEITAS",
-  dividas: "GESTÃO DE DÍVIDAS",
-  investimentos: "CARTEIRA DE INVESTIMENTOS",
-  projecoes: "SIMULADOR DE CENÁRIOS",
-  ia: "IA FINANCEIRA",
-  configuracoes: "CONFIGURAÇÕES",
+  dashboard: "STRATEGIC OVERVIEW",
+  ledger: "OPERATIONAL LEDGER",
+  gastos: "EXPENSE CONTROL",
+  receitas: "INCOME FLOW",
+  dividas: "DEBT MANAGEMENT",
+  investimentos: "INVESTMENT PORTFOLIO",
+  projecoes: "SCENARIO SIMULATOR",
+  ia: "AI FINANCE",
+  configuracoes: "SETTINGS",
 };
 
 export function Topbar({
@@ -59,6 +62,8 @@ export function Topbar({
   onSignOut,
   isPending,
   notifications = [],
+  hasPrev = true,
+  hasNext = true,
   className,
 }: TopbarProps) {
   const viewLabel = viewLabels[activeView] ?? activeView.toUpperCase();
@@ -86,8 +91,9 @@ export function Topbar({
       <div className="flex items-center gap-1">
         <button
           onClick={onPrevMonth}
-          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Mês anterior"
+          disabled={!hasPrev}
+          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+          aria-label="Previous month"
         >
           <ChevronLeft className="size-4" />
         </button>
@@ -98,8 +104,9 @@ export function Topbar({
         </div>
         <button
           onClick={onNextMonth}
-          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Próximo mês"
+          disabled={!hasNext}
+          className="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+          aria-label="Next month"
         >
           <ChevronRight className="size-4" />
         </button>
@@ -116,7 +123,7 @@ export function Topbar({
           disabled={isPending}
         >
           <Plus className="size-3.5" data-icon="inline-start" />
-          <span className="hidden sm:inline">Lançamento</span>
+          <span className="hidden sm:inline">New Entry</span>
         </Button>
         {userEmail && onSignOut && (
           <DropdownMenu>
@@ -134,7 +141,7 @@ export function Topbar({
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive cursor-pointer">
                 <LogOut className="size-3.5 mr-2" />
-                Sair
+                Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

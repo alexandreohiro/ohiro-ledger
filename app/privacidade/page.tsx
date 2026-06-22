@@ -1,143 +1,170 @@
-import Link from 'next/link'
-import { ShieldCheck } from 'lucide-react'
+import Link from "next/link";
+import { Shield, ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: 'Política de Privacidade — Ohiro',
-  description: 'Como o Ohiro coleta, usa e protege seus dados pessoais, em conformidade com a LGPD.',
+export const metadata: Metadata = {
+  title: "Política de Privacidade — Ohiro",
+  description:
+    "Como o Ohiro coleta, usa e protege seus dados financeiros pessoais, em conformidade com a LGPD.",
+};
+
+export default function PrivacidadePage() {
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="max-w-3xl mx-auto px-6 py-12">
+        {/* Voltar */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mb-10"
+        >
+          <ArrowLeft className="size-3.5" />
+          Voltar ao início
+        </Link>
+
+        {/* Cabeçalho */}
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-center size-9 rounded-md bg-primary/10 border border-primary/20">
+            <Shield className="size-4 text-primary" />
+          </div>
+          <h1 className="text-xl font-bold font-mono tracking-tight text-foreground">
+            Política de Privacidade
+          </h1>
+        </div>
+        <p className="text-xs font-mono text-muted-foreground mb-10">
+          Ohiro · Última atualização: junho de 2026
+        </p>
+
+        <div className="flex flex-col gap-8 text-sm font-mono leading-relaxed text-foreground/80">
+
+          <Section title="1. Quem somos">
+            <p>
+              O Ohiro é um aplicativo de gestão financeira pessoal desenvolvido e operado por Alexandre Ohiro
+              (&quot;nós&quot;, &quot;nosso&quot;). Encarregado de Dados (DPO):{" "}
+              <a href="mailto:privacidade@ohiroledger.com" className="text-primary underline underline-offset-2">
+                privacidade@ohiroledger.com
+              </a>
+              .
+            </p>
+          </Section>
+
+          <Section title="2. Dados coletados">
+            <ul className="list-disc list-inside space-y-1.5 text-foreground/70">
+              <li>
+                <strong className="text-foreground">Conta:</strong> endereço de e-mail e senha (armazenada em hash via Supabase Auth — nunca em texto claro).
+              </li>
+              <li>
+                <strong className="text-foreground">Dados financeiros:</strong> transações, investimentos, dívidas e configurações de notificação que você cadastra voluntariamente.
+              </li>
+              <li>
+                <strong className="text-foreground">Arquivos enviados à IA:</strong> documentos (extratos, comprovantes) que você opcionalmente envia ao assistente de IA para análise. Esses arquivos são transmitidos ao provedor de IA selecionado e <strong className="text-foreground">não são armazenados por nós</strong> após o processamento da resposta.
+              </li>
+              <li>
+                <strong className="text-foreground">Logs técnicos:</strong> registros de acesso e erro para segurança e diagnóstico, retidos por até 30 dias.
+              </li>
+            </ul>
+          </Section>
+
+          <Section title="3. Finalidade e base legal">
+            <table className="w-full text-xs border border-border/40 rounded-lg overflow-hidden">
+              <thead className="bg-muted/30">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">Finalidade</th>
+                  <th className="text-left px-3 py-2 font-semibold">Base legal (LGPD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                <TableRow a="Autenticação e segurança da conta" b="Execução de contrato (Art. 7º, V)" />
+                <TableRow a="Armazenamento de dados financeiros" b="Execução de contrato (Art. 7º, V)" />
+                <TableRow a="Envio de alertas de vencimento" b="Legítimo interesse / consentimento (Art. 7º, IX / II)" />
+                <TableRow a="Processamento por IA (Gemini/OpenAI/etc.)" b="Consentimento explícito e renovável (Art. 7º, I)" />
+                <TableRow a="Diagnóstico e segurança (logs)" b="Legítimo interesse (Art. 7º, IX)" />
+              </tbody>
+            </table>
+          </Section>
+
+          <Section title="4. Transferência internacional de dados">
+            <p>
+              O recurso de <strong className="text-foreground">IA Financeira</strong> permite que você envie mensagens e arquivos a provedores de inteligência artificial terceirizados, que podem operar fora do Brasil:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-foreground/70 mt-2">
+              <li>Google Gemini (Google LLC — EUA)</li>
+              <li>OpenAI GPT (OpenAI LLC — EUA)</li>
+              <li>Anthropic Claude (Anthropic, PBC — EUA)</li>
+              <li>Groq / Meta Llama (Groq, Inc. — EUA)</li>
+            </ul>
+            <p className="mt-2">
+              Essa transferência ocorre <strong className="text-foreground">somente mediante seu consentimento explícito</strong>, obtido na primeira vez que você ativa o recurso de IA. Você pode revogar o consentimento a qualquer momento nas Configurações.
+              Os dados enviados são sujeitos às políticas de privacidade de cada provedor. Recomendamos <strong className="text-foreground">não incluir CPF, número de cartão ou senhas</strong> nas mensagens.
+            </p>
+          </Section>
+
+          <Section title="5. Prazo de retenção">
+            <ul className="list-disc list-inside space-y-1.5 text-foreground/70">
+              <li>Dados financeiros: enquanto a conta estiver ativa.</li>
+              <li>Após exclusão de conta: dados apagados ou anonimizados em até 30 dias.</li>
+              <li>Logs técnicos: até 30 dias.</li>
+              <li>Arquivos enviados à IA: não retidos — processados em tempo real e descartados.</li>
+            </ul>
+          </Section>
+
+          <Section title="6. Seus direitos como titular (Art. 18 LGPD)">
+            <ul className="list-disc list-inside space-y-1.5 text-foreground/70">
+              <li>Confirmar a existência de tratamento dos seus dados.</li>
+              <li>Acessar e exportar seus dados (disponível em Configurações → Exportar dados).</li>
+              <li>Corrigir dados incompletos ou inexatos.</li>
+              <li>Revogar o consentimento para uso de IA (Configurações → IA Financeira).</li>
+              <li>Solicitar a exclusão de todos os dados e da conta (Configurações → Excluir conta).</li>
+              <li>Portabilidade: exportação em JSON com todos os registros.</li>
+            </ul>
+            <p className="mt-2">
+              Para exercer qualquer direito, entre em contato:{" "}
+              <a href="mailto:privacidade@ohiroledger.com" className="text-primary underline underline-offset-2">
+                privacidade@ohiroledger.com
+              </a>
+              . Responderemos em até 15 dias úteis.
+            </p>
+          </Section>
+
+          <Section title="7. Segurança">
+            <p>
+              Adotamos Row Level Security (RLS) no banco de dados, autenticação via Supabase Auth com hash de senha,
+              comunicação exclusivamente via HTTPS/TLS, e headers de segurança (CSP, HSTS, X-Frame-Options).
+              Dados financeiros nunca são expostos a outros usuários.
+            </p>
+          </Section>
+
+          <Section title="8. Contato e DPO">
+            <p>
+              Encarregado de Dados (DPO): Alexandre Ohiro.{" "}
+              <a href="mailto:privacidade@ohiroledger.com" className="text-primary underline underline-offset-2">
+                privacidade@ohiroledger.com
+              </a>
+              {" "}— use este endereço para exercer seus direitos de titular ou para qualquer dúvida sobre privacidade.
+            </p>
+          </Section>
+
+        </div>
+      </div>
+    </main>
+  );
 }
 
-export default function PrivacyPolicyPage() {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-svh w-full bg-background p-6">
-      <div className="mx-auto w-full max-w-2xl flex flex-col gap-8 py-10">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex size-14 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
-            <ShieldCheck className="size-7 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-mono text-xl font-bold tracking-widest text-foreground uppercase">
-              Política de Privacidade
-            </h1>
-            <p className="text-xs text-muted-foreground font-mono tracking-wider mt-1">
-              OHIRO
-            </p>
-          </div>
-        </div>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-xs font-mono font-bold text-foreground tracking-widest uppercase border-b border-border/40 pb-2">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
-        <div className="rounded-xl border border-border bg-card p-6 flex flex-col gap-6 text-sm text-foreground/90 leading-relaxed">
-          <p className="text-xs text-muted-foreground font-mono">
-            Última atualização: 21 de junho de 2026
-          </p>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              1. Controlador dos dados
-            </h2>
-            <p>
-              O Ohiro ("nós") é o controlador dos dados pessoais tratados nesta
-              plataforma, nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).
-            </p>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              2. Dados que coletamos
-            </h2>
-            <p>Coletamos os dados que você fornece diretamente ao usar o sistema:</p>
-            <ul className="list-disc pl-5 flex flex-col gap-1">
-              <li>Dados de cadastro: e-mail e senha (a senha é armazenada de forma criptografada pelo provedor de autenticação).</li>
-              <li>Dados financeiros que você insere: transações, dívidas, investimentos, descrições e valores.</li>
-              <li>Conteúdo enviado ao assistente de IA (OHIRO-IA): mensagens de texto e, opcionalmente, arquivos (imagens, PDFs, planilhas) que você decide enviar para análise.</li>
-            </ul>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              3. Finalidade do tratamento
-            </h2>
-            <p>
-              Usamos seus dados exclusivamente para operar o produto: autenticação, armazenamento
-              e exibição do seu controle financeiro, geração de indicadores e respostas do
-              assistente de IA. Não usamos seus dados financeiros para fins de publicidade.
-            </p>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              4. Compartilhamento com terceiros e transferência internacional
-            </h2>
-            <p>Para operar o serviço, utilizamos os seguintes operadores de dados:</p>
-            <ul className="list-disc pl-5 flex flex-col gap-1">
-              <li>
-                <strong>Supabase</strong> (infraestrutura de banco de dados e autenticação), responsável
-                pelo armazenamento dos seus dados de cadastro e financeiros, protegidos por controle de
-                acesso por usuário (Row Level Security).
-              </li>
-              <li>
-                <strong>Google (Gemini API)</strong> — quando você usa o assistente de IA (OHIRO-IA), o
-                conteúdo da sua mensagem e o contexto financeiro necessário para responder são enviados
-                ao modelo Gemini, operado pelo Google, para gerar a resposta. Isso configura uma
-                <strong> transferência internacional de dados</strong>, já que os servidores do Google
-                podem processar essa informação fora do Brasil. Essa transferência ocorre apenas quando
-                você efetivamente usa o assistente de IA, e apenas com o conteúdo necessário para a
-                interação solicitada. O Google não recebe suas credenciais de acesso.
-              </li>
-            </ul>
-            <p>Não vendemos nem compartilhamos seus dados com terceiros para fins de marketing.</p>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              5. Seus direitos
-            </h2>
-            <p>Nos termos dos artigos 17 a 22 da LGPD, você pode solicitar, a qualquer momento:</p>
-            <ul className="list-disc pl-5 flex flex-col gap-1">
-              <li>Confirmação da existência de tratamento e acesso aos seus dados.</li>
-              <li>Correção de dados incompletos, inexatos ou desatualizados.</li>
-              <li>Exportação dos seus dados em formato estruturado (disponível na área de Configurações do sistema).</li>
-              <li>Exclusão dos seus dados e da sua conta.</li>
-              <li>Revogação do consentimento, quando aplicável.</li>
-            </ul>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              6. Retenção e exclusão
-            </h2>
-            <p>
-              Seus dados são mantidos enquanto sua conta estiver ativa. Ao excluir sua conta, seus
-              dados financeiros, dívidas, investimentos e notificações são removidos permanentemente.
-            </p>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              7. Segurança
-            </h2>
-            <p>
-              Aplicamos controle de acesso por usuário em nível de banco de dados (Row Level
-              Security), de forma que cada usuário só pode acessar os seus próprios dados, mesmo em
-              caso de falha na camada de aplicação.
-            </p>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-              8. Contato
-            </h2>
-            <p>
-              Para exercer seus direitos ou esclarecer dúvidas sobre esta política, entre em contato
-              pelo e-mail informado no rodapé do sistema.
-            </p>
-          </section>
-        </div>
-
-        <p className="text-center text-xs text-muted-foreground">
-          <Link href="/" className="text-primary hover:underline font-mono">
-            Voltar
-          </Link>
-        </p>
-      </div>
-    </div>
-  )
+function TableRow({ a, b }: { a: string; b: string }) {
+  return (
+    <tr>
+      <td className="px-3 py-2 text-foreground/70">{a}</td>
+      <td className="px-3 py-2 text-muted-foreground">{b}</td>
+    </tr>
+  );
 }

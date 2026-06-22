@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ActiveView, Transaction, Investment, Debt, Account } from "@/lib/types";
-import { calcFinancialSummary } from "@/lib/calculations";
+import {
+  calcFinancialSummary,
+  filterByMonth,
+  getAvailableMonths,
+  formatMonthYear,
+} from "@/lib/calculations";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { AddTransactionModal } from "./add-transaction-modal";
@@ -26,9 +31,9 @@ import {
   addDebt,
   updateDebt,
   deleteDebt,
-  addAccount,
-  updateAccount,
-  deleteAccount,
+  addBankAccount,
+  updateBankAccount,
+  deleteBankAccount,
   signOut,
 } from "@/lib/actions";
 import type { Notification } from "@/lib/notification-actions";
@@ -43,6 +48,7 @@ interface AppShellProps {
   initialAccounts: Account[];
   initialNotifications: Notification[];
   initialNotificationDays: number;
+  initialAiConsent: boolean;
 }
 
 export function AppShell({
@@ -53,11 +59,10 @@ export function AppShell({
   initialAccounts,
   initialNotifications,
   initialNotificationDays,
+  initialAiConsent,
 }: AppShellProps) {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [usdRate, setUsdRate] = useState(5.05);
 
   // Otimistic local state — revalidado pelo servidor via revalidatePath
@@ -69,15 +74,42 @@ export function AppShell({
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const summary = calcFinancialSummary(transactions, investments);
+  // ── Meses disponíveis (baseados nos lançamentos reais) ────────────────────
+  const availableMonths = useMemo(() => {
+    const keys = getAvailableMonths(transactions);
+    // Garante que o mês atual sempre aparece mesmo sem lançamentos
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (!keys.includes(currentKey)) keys.push(currentKey);
+    return keys.sort();
+  }, [transactions]);
+
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  const currentMonthIndex = availableMonths.indexOf(selectedMonthKey);
+  const [currentYear, currentMonth] = selectedMonthKey.split("-").map(Number);
+  // currentMonth here is 1-indexed; views expect 0-indexed
+  const currentMonthZero = currentMonth - 1;
+
+  const monthTransactions = useMemo(
+    () => filterByMonth(transactions, currentMonthZero, currentYear),
+    [transactions, currentMonthZero, currentYear]
+  );
+
+  const summary = calcFinancialSummary(monthTransactions, investments);
 
   function handlePrevMonth() {
-    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear((y) => y - 1); }
-    else setCurrentMonth((m) => m - 1);
+    if (currentMonthIndex > 0) {
+      setSelectedMonthKey(availableMonths[currentMonthIndex - 1]);
+    }
   }
   function handleNextMonth() {
-    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); }
-    else setCurrentMonth((m) => m + 1);
+    if (currentMonthIndex < availableMonths.length - 1) {
+      setSelectedMonthKey(availableMonths[currentMonthIndex + 1]);
+    }
   }
 
   // ── Transactions ──────────────────────────────────────────────────────────
@@ -90,7 +122,7 @@ export function AppShell({
       startTransition(() => router.refresh());
     } catch {
       setTransactions((prev) => prev.filter((t) => t.id !== tempId));
-      toast.error("Erro ao adicionar lançamento");
+      toast.error("Error adding entry");
     }
   }
 
@@ -100,7 +132,7 @@ export function AppShell({
       await updateTransaction(tx);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao atualizar lançamento");
+      toast.error("Error updating entry");
     }
   }
 
@@ -110,7 +142,7 @@ export function AppShell({
       await deleteTransaction(id);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao excluir lançamento");
+      toast.error("Error deleting entry");
     }
   }
 
@@ -123,7 +155,7 @@ export function AppShell({
       startTransition(() => router.refresh());
     } catch {
       setInvestments((prev) => prev.filter((i) => i.id !== tempId));
-      toast.error("Erro ao adicionar investimento");
+      toast.error("Error adding investment");
     }
   }
 
@@ -133,7 +165,7 @@ export function AppShell({
       await updateInvestment(inv);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao atualizar investimento");
+      toast.error("Error updating investment");
     }
   }
 
@@ -143,7 +175,7 @@ export function AppShell({
       await deleteInvestment(id);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao excluir investimento");
+      toast.error("Error deleting investment");
     }
   }
 
@@ -156,7 +188,7 @@ export function AppShell({
       startTransition(() => router.refresh());
     } catch {
       setDebts((prev) => prev.filter((d) => d.id !== tempId));
-      toast.error("Erro ao adicionar dívida");
+      toast.error("Error adding debt");
     }
   }
 
@@ -166,7 +198,7 @@ export function AppShell({
       await updateDebt(debt);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao atualizar dívida");
+      toast.error("Error updating debt");
     }
   }
 
@@ -176,7 +208,7 @@ export function AppShell({
       await deleteDebt(id);
       startTransition(() => router.refresh());
     } catch {
-      toast.error("Erro ao excluir dívida");
+      toast.error("Error deleting debt");
     }
   }
 
@@ -185,7 +217,7 @@ export function AppShell({
     const tempId = crypto.randomUUID();
     setAccounts((prev) => [{ ...account, id: tempId }, ...prev]);
     try {
-      await addAccount(account);
+      await addBankAccount(account);
       startTransition(() => router.refresh());
     } catch {
       setAccounts((prev) => prev.filter((a) => a.id !== tempId));
@@ -196,7 +228,7 @@ export function AppShell({
   async function handleUpdateAccount(account: Account) {
     setAccounts((prev) => prev.map((a) => (a.id === account.id ? account : a)));
     try {
-      await updateAccount(account);
+      await updateBankAccount(account);
       startTransition(() => router.refresh());
     } catch {
       toast.error("Erro ao atualizar conta");
@@ -206,7 +238,7 @@ export function AppShell({
   async function handleDeleteAccount(id: string) {
     setAccounts((prev) => prev.filter((a) => a.id !== id));
     try {
-      await deleteAccount(id);
+      await deleteBankAccount(id);
       startTransition(() => router.refresh());
     } catch {
       toast.error("Erro ao excluir conta");
@@ -223,19 +255,19 @@ export function AppShell({
 
   // ── Reset (limpar todos os dados do usuário) ───────────────────────────────
   async function handleResetData() {
-    if (!confirm("Tem certeza? Todos os dados serão excluídos permanentemente.")) return;
+    if (!confirm("Are you sure? All data will be permanently deleted.")) return;
     // Limpar cada registro via actions
     await Promise.all([
       ...transactions.map((t) => deleteTransaction(t.id)),
       ...investments.map((i) => deleteInvestment(i.id)),
       ...debts.map((d) => deleteDebt(d.id)),
-      ...accounts.map((a) => deleteAccount(a.id)),
+      ...accounts.map((a) => deleteBankAccount(a.id)),
     ]);
     setTransactions([]);
     setInvestments([]);
     setDebts([]);
     setAccounts([]);
-    toast.success("Dados resetados");
+    toast.success("Data reset");
     startTransition(() => router.refresh());
   }
 
@@ -246,7 +278,7 @@ export function AppShell({
       <div className="flex-1 flex flex-col min-h-screen transition-all duration-300 md:ml-56">
         <Topbar
           activeView={activeView}
-          currentMonth={currentMonth}
+          currentMonth={currentMonthZero}
           currentYear={currentYear}
           riskLevel={summary.riskLevel}
           onPrevMonth={handlePrevMonth}
@@ -256,25 +288,46 @@ export function AppShell({
           onSignOut={handleSignOut}
           isPending={isPending}
           notifications={initialNotifications}
+          hasPrev={currentMonthIndex > 0}
+          hasNext={currentMonthIndex < availableMonths.length - 1}
+          availableMonthsCount={availableMonths.length}
         />
 
         <main className="flex-1 overflow-auto">
           {activeView === "dashboard" && (
-            <DashboardView transactions={transactions} investments={investments} />
+            <DashboardView
+              transactions={transactions}
+              monthTransactions={monthTransactions}
+              investments={investments}
+              selectedMonthKey={selectedMonthKey}
+            />
           )}
           {activeView === "ledger" && (
             <LedgerView
               transactions={transactions}
+              selectedMonthKey={selectedMonthKey}
+              availableMonths={availableMonths}
+              onSelectMonth={setSelectedMonthKey}
               onAdd={handleAddTransaction}
               onUpdate={handleUpdateTransaction}
               onRemove={handleDeleteTransaction}
             />
           )}
           {activeView === "gastos" && (
-            <ExpensesRevenuesView transactions={transactions} mode="gastos" />
+            <ExpensesRevenuesView
+              transactions={transactions}
+              monthTransactions={monthTransactions}
+              selectedMonthKey={selectedMonthKey}
+              mode="gastos"
+            />
           )}
           {activeView === "receitas" && (
-            <ExpensesRevenuesView transactions={transactions} mode="receitas" />
+            <ExpensesRevenuesView
+              transactions={transactions}
+              monthTransactions={monthTransactions}
+              selectedMonthKey={selectedMonthKey}
+              mode="receitas"
+            />
           )}
           {activeView === "dividas" && (
             <DebtsView
@@ -316,6 +369,7 @@ export function AppShell({
             <SettingsView
               onResetData={handleResetData}
               initialNotificationDays={initialNotificationDays}
+              initialAiConsent={initialAiConsent}
             />
           )}
         </main>

@@ -33,8 +33,20 @@ import {
   Database,
   PlusCircle,
   ShieldCheck,
+  ChevronRight,
+  Cpu,
+  Activity,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AI_PROVIDERS,
+  type ProviderId,
+  type AIProviderDef,
+  DEFAULT_PROVIDER_ID,
+  getTodayUsage,
+  recordUsage,
+} from "@/lib/ai-providers";
 
 // ── Tipos de arquivo aceitos ──────────────────────────────────────────────────
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv";
@@ -69,62 +81,85 @@ function buildFinancialContext(
     .slice(0, 5);
   const activeDebts = debts.filter((d) => d.status === "Ativo" || d.status === "Atrasado");
 
+  // Agrupa gastos por categoria
+  const byCategory: Record<string, number> = {};
+  transactions
+    .filter((t) => t.type === "Gasto")
+    .forEach((t) => { byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount; });
+  const topCategories = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
   return [
-    "### Resumo Financeiro",
-    `- Receitas: ${formatCurrency(summary.totalRevenue)}`,
-    `- Gastos: ${formatCurrency(summary.totalExpenses)}`,
-    `- Saldo livre: ${formatCurrency(summary.freeBalance)}`,
-    `- Total dívidas: ${formatCurrency(summary.totalDebts)}`,
-    `- Total investimentos: ${formatCurrency(summary.totalInvestments)}`,
-    `- Patrimônio líquido: ${formatCurrency(summary.totalPatrimony)}`,
-    `- Comprometimento renda: ${summary.incomeCommitment.toFixed(1)}%`,
-    `- Taxa investimento: ${summary.investmentRate.toFixed(1)}%`,
-    `- Nível de risco: ${summary.riskLevel}`,
+    "### Current Financial Summary",
+    `- Total income: ${formatCurrency(summary.totalRevenue)}`,
+    `- Total expenses: ${formatCurrency(summary.totalExpenses)}`,
+    `- Free balance: ${formatCurrency(summary.freeBalance)}`,
+    `- Total active debts: ${formatCurrency(summary.totalDebts)}`,
+    `- Total investments: ${formatCurrency(summary.totalInvestments)}`,
+    `- Net worth: ${formatCurrency(summary.totalPatrimony)}`,
+    `- Income commitment: ${summary.incomeCommitment.toFixed(1)}%`,
+    `- Investment rate: ${summary.investmentRate.toFixed(1)}%`,
+    `- Risk level: ${summary.riskLevel}`,
+    `- Total entries: ${transactions.length}`,
     "",
-    "### Top 5 Maiores Gastos",
+    "### Top Spending Categories",
+    ...topCategories.map(([cat, val]) => `- ${cat}: ${formatCurrency(val)}`),
+    "",
+    "### Top 5 Largest Expenses (with IDs for editing)",
     ...topExpenses.map(
-      (t) => `- ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date}`
+      (t) => `- ID:${t.id} | ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`
     ),
     "",
-    "### Dívidas Ativas",
+    "### Active Debts (with IDs for editing)",
     ...activeDebts.map(
       (d) =>
-        `- ${d.creditor}: ${formatCurrency(d.currentAmount)} | parcela: ${formatCurrency(d.installmentAmount)} | ${d.interestRate.toFixed(2)}%/mês | prioridade: ${d.priority} | venc: ${d.dueDate ?? "—"}`
+        `- ID:${d.id} | ${d.creditor}: balance ${formatCurrency(d.currentAmount)} | installment ${formatCurrency(d.installmentAmount)} | ${d.interestRate.toFixed(2)}%/month | priority: ${d.priority} | due: ${d.dueDate ?? "—"}`
     ),
     "",
-    "### Carteira de Investimentos",
+    "### Investment Portfolio",
     ...investments.map(
       (i) =>
-        `- ${i.assetName} (${i.class}): ${formatCurrency(i.convertedAmountBRL)} | aporte: ${formatCurrency(i.monthlyContribution)}/mês`
+        `- ${i.assetName} (${i.class}): ${formatCurrency(i.convertedAmountBRL)} | monthly contribution: ${formatCurrency(i.monthlyContribution)}`
     ),
     "",
-    "### Últimos 10 Lançamentos",
+    "### Last 15 Entries (with IDs for editing)",
     ...transactions
-      .slice(0, 10)
-      .map((t) => `- [${t.type}] ${t.description}: ${formatCurrency(t.amount)} — ${t.date} (${t.status})`),
+      .slice(0, 15)
+      .map((t) => `- ID:${t.id} | [${t.type}] ${t.description} (${t.category}): ${formatCurrency(t.amount)} — ${t.date} — ${t.status}`),
   ].join("\n");
 }
 
 const QUICK_PROMPTS = [
   {
     icon: AlertTriangle,
-    label: "Análise de risco",
-    text: "Analise meu nível de risco financeiro atual e quais são os maiores pontos de atenção.",
+    label: "Risk analysis",
+    text: "Read my current data and analyze my financial risk level. What are the biggest points of concern?",
   },
   {
     icon: TrendingUp,
-    label: "Estratégia de dívidas",
-    text: "Qual a melhor estratégia para quitar minhas dívidas mais rápido e pagar menos juros?",
+    label: "Debt strategy",
+    text: "Which debts should I prioritize paying off first? Calculate the total cost of each and suggest a payment order.",
   },
   {
     icon: BarChart3,
-    label: "Saúde dos investimentos",
-    text: "Como está minha carteira de investimentos? Está diversificada? O que posso melhorar?",
+    label: "Month summary",
+    text: "Give me a complete summary of the current month: income, expenses by category, free balance, and comparison with the ideal.",
   },
   {
     icon: Sparkles,
-    label: "Oportunidades de economia",
-    text: "Em quais categorias posso cortar despesas para melhorar minha saúde financeira?",
+    label: "Where to save",
+    text: "Analyze my spending and point out the 3 categories where I'm spending more than I should, with practical suggestions to cut back.",
+  },
+  {
+    icon: Database,
+    label: "List entries",
+    text: "List my last 20 entries with ID, date, description, and amount so I can review them.",
+  },
+  {
+    icon: PlusCircle,
+    label: "Log a paycheck",
+    text: "I want to log my paycheck. Tell me what information I need to provide, or send the image directly.",
   },
 ];
 
@@ -138,21 +173,61 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   const [inputValue, setInputValue] = useState("");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  // Guarda os arquivos enviados por ID da mensagem para exibi-los na bolha
+  const [sentFilesMap, setSentFilesMap] = useState<Record<string, AttachedFile[]>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
+  // Provider selecionado e painel de troca
+  const [selectedProvider, setSelectedProvider] = useState<ProviderId>(DEFAULT_PROVIDER_ID);
+  const [showProviderPanel, setShowProviderPanel] = useState(false);
+  // Uso diário rastreado localmente
+  const [todayUsage, setTodayUsage] = useState(() => getTodayUsage());
+  // Saldo de créditos (USD) dos providers pagos — vem do Supabase (ai_credits)
+  const [creditBalances, setCreditBalances] = useState<Partial<Record<ProviderId, number>>>({});
+
+  const refreshCreditBalances = useCallback(async () => {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase.from("ai_credits").select("provider_id, balance_usd");
+    if (!data) return;
+    const next: Partial<Record<ProviderId, number>> = {};
+    for (const row of data) next[row.provider_id as ProviderId] = Number(row.balance_usd);
+    setCreditBalances(next);
+  }, []);
+
+  useEffect(() => {
+    refreshCreditBalances();
+  }, [refreshCreditBalances]);
+
   const financialContext = buildFinancialContext(transactions, investments, debts);
 
-  const { messages, sendMessage, status } = useChat({
+  // Ref para capturar os arquivos pendentes no momento do envio
+  const pendingFilesRef = useRef<AttachedFile[]>([]);
+  // Ref com arquivos aguardando ser associados à próxima mensagem do usuário
+  const nextMsgFilesRef = useRef<AttachedFile[]>([]);
+
+  // useChat cria a instância de chat (e o transport) apenas uma vez no mount,
+  // então prepareSendMessagesRequest fica com um closure "congelado". Refs
+  // garantem que cada envio use o provider e o contexto financeiro atuais.
+  const selectedProviderRef = useRef(selectedProvider);
+  selectedProviderRef.current = selectedProvider;
+  const financialContextRef = useRef(financialContext);
+  financialContextRef.current = financialContext;
+
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  const { messages, sendMessage, status, stop, regenerate } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/chat",
       prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
         body: {
           id,
           messages: msgs,
-          context: financialContext,
-          files: attachedFiles.map((f) => ({
+          context: financialContextRef.current,
+          provider: selectedProviderRef.current,
+          files: pendingFilesRef.current.map((f) => ({
             name: f.name,
             type: f.type,
             data: f.base64,
@@ -160,6 +235,27 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         },
       }),
     }),
+    onError: (err) => {
+      const msg = err?.message ?? String(err);
+      const lower = msg.toLowerCase();
+      if (lower.includes("429") || lower.includes("quota") || lower.includes("rate")) {
+        setApiError("Request limit reached. Wait a few moments or switch models.");
+      } else if (msg.includes("401") || lower.includes("autenticad")) {
+        setApiError("Session expired. Reload the page.");
+      } else if (lower.includes("não suporta") || lower.includes("não configurada") || lower.includes("saldo de créditos")) {
+        // These messages already come from the server in Portuguese and are specific
+        // (e.g. provider doesn't support files, missing API key, credits exhausted) — show as-is, don't genericize.
+        setApiError(msg);
+      } else if (lower.includes("failed to fetch") || lower.includes("network")) {
+        setApiError("No connection to the server. Check your internet and try again.");
+      } else {
+        setApiError("Failed to communicate with the AI. Check your connection and try again.");
+      }
+    },
+    onFinish: () => {
+      // Atualiza o saldo de créditos exibido após cada resposta (providers pagos debitam por token)
+      refreshCreditBalances();
+    },
   });
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -179,10 +275,23 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
     const hasTool = lastMsg.parts?.some(
-      (p: { type: string }) =>
-        p.type === "tool-invocation"
+      (p: { type: string }) => p.type === "tool-invocation"
     );
     if (hasTool) setNeedsRefresh(true);
+  }, [messages]);
+
+  // Quando uma nova mensagem do usuário aparecer e houver arquivos pendentes, associa
+  useEffect(() => {
+    if (nextMsgFilesRef.current.length === 0) return;
+    const userMsgs = messages.filter((m) => m.role === "user");
+    if (userMsgs.length === 0) return;
+    const lastUser = userMsgs[userMsgs.length - 1];
+    setSentFilesMap((prev) => {
+      if (prev[lastUser.id]) return prev; // já associado
+      const files = nextMsgFilesRef.current;
+      nextMsgFilesRef.current = [];
+      return { ...prev, [lastUser.id]: files };
+    });
   }, [messages]);
 
   // ── File handling ─────────────────────────────────────────────────────────
@@ -190,19 +299,19 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
     setFileError(null);
     const files = Array.from(fileList);
     if (attachedFiles.length + files.length > MAX_FILES) {
-      setFileError(`Máximo de ${MAX_FILES} arquivos por mensagem.`);
+      setFileError(`Maximum of ${MAX_FILES} files per message.`);
       return;
     }
 
     const newAttached: AttachedFile[] = [];
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE) {
-        setFileError(`"${file.name}" excede 10 MB.`);
+        setFileError(`"${file.name}" exceeds 10 MB.`);
         return;
       }
       const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf", "text/plain", "text/csv"];
       if (!allowedTypes.includes(file.type)) {
-        setFileError(`Tipo não suportado: ${file.name}. Use imagem, PDF, TXT ou CSV.`);
+        setFileError(`Unsupported type: ${file.name}. Use image, PDF, TXT, or CSV.`);
         return;
       }
 
@@ -265,11 +374,25 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
   function handleSend() {
     const text = inputValue.trim();
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
-    const msgText = text || (attachedFiles.length > 0 ? "Analise os arquivos enviados e extraia as informações financeiras relevantes." : "");
+    const msgText = text || "Analyze the uploaded files and extract the relevant financial information.";
+
+    // Captura os arquivos em duas refs: uma para o body da request, outra para a UI
+    const snapshot = [...attachedFiles];
+    pendingFilesRef.current = snapshot;
+    if (snapshot.length > 0) {
+      nextMsgFilesRef.current = snapshot; // será associado via useEffect quando a msg aparecer
+    }
+
     sendMessage({ text: msgText });
+
+    // Registra +1 requisição local para o provider selecionado
+    recordUsage(selectedProvider);
+    setTodayUsage(getTodayUsage());
+
     setInputValue("");
     setAttachedFiles([]);
     setFileError(null);
+    setApiError(null);
     setNeedsRefresh(false);
   }
 
@@ -314,36 +437,88 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           <div className="flex items-center justify-center size-16 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/40">
             <Paperclip className="size-7 text-primary" />
           </div>
-          <p className="text-sm font-mono font-semibold text-primary">Solte os arquivos aqui</p>
-          <p className="text-xs font-mono text-muted-foreground">Imagens, PDF, TXT, CSV — máx 10 MB cada</p>
+          <p className="text-sm font-mono font-semibold text-primary">Drop files here</p>
+          <p className="text-xs font-mono text-muted-foreground">Images, PDF, TXT, CSV — max 10 MB each</p>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-card/30 backdrop-blur-sm shrink-0">
-        <div className="flex items-center justify-center size-8 rounded-md bg-primary/10 border border-primary/20">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card/30 backdrop-blur-sm shrink-0">
+        <div className="flex items-center justify-center size-8 rounded-md bg-primary/10 border border-primary/20 shrink-0">
           <Bot className="size-4 text-primary" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-sm font-bold font-mono text-foreground tracking-wide">OHIRO-IA</h1>
-          <p className="text-[11px] font-mono text-muted-foreground tracking-widest">
-            ASSISTENTE FINANCEIRO · MULTIMODAL
+          <p className="text-[10px] font-mono text-muted-foreground tracking-widest truncate">
+            FINANCIAL ASSISTANT · MULTIMODAL
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          {/* Refresh hint quando IA inseriu dados */}
+
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {needsRefresh && (
             <button
               onClick={() => window.location.reload()}
               className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors animate-pulse"
             >
               <RefreshCw className="size-3" />
-              Recarregar dados
+              Reload
             </button>
           )}
+
+          {/* Botão seletor de provider */}
+          {(() => {
+            const prov = AI_PROVIDERS.find((p) => p.id === selectedProvider)!;
+            const usage = todayUsage.requests[selectedProvider] ?? 0;
+            const limit = prov.freeDailyRequests;
+            const remaining = limit != null ? Math.max(limit - usage, 0) : null;
+            const isNearLimit = limit != null && usage / limit > 0.8;
+            const balance = creditBalances[selectedProvider];
+            const isLowBalance = prov.billedByCredit && balance != null && balance < 1;
+            return (
+              <button
+                onClick={() => setShowProviderPanel((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-md border transition-all",
+                  showProviderPanel
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-border/50 bg-card/40 text-muted-foreground hover:text-foreground hover:border-border/80"
+                )}
+                aria-label="Select AI model"
+              >
+                <Cpu className="size-3 shrink-0" />
+                <span className="hidden sm:inline">{prov.modelLabel}</span>
+                {remaining != null && (
+                  <span
+                    className={cn(
+                      "hidden sm:inline px-1.5 py-0.5 rounded border text-[9px]",
+                      isNearLimit
+                        ? "border-destructive/40 text-destructive bg-destructive/10"
+                        : "border-border/40 text-muted-foreground/70 bg-muted/20"
+                    )}
+                  >
+                    {remaining} left
+                  </span>
+                )}
+                {prov.billedByCredit && balance != null && (
+                  <span
+                    className={cn(
+                      "hidden sm:inline px-1.5 py-0.5 rounded border text-[9px]",
+                      isLowBalance
+                        ? "border-destructive/40 text-destructive bg-destructive/10"
+                        : "border-border/40 text-muted-foreground/70 bg-muted/20"
+                    )}
+                  >
+                    ${balance.toFixed(2)} balance
+                  </span>
+                )}
+                <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
+              </button>
+            );
+          })()}
+
           <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border border-border/40">
             <ShieldCheck className="size-3 text-muted-foreground/60" />
-            <span className="text-muted-foreground/60">Dados criptografados</span>
+            <span className="text-muted-foreground/60 hidden sm:inline">Encrypted</span>
           </div>
           <div
             className={cn(
@@ -354,17 +529,33 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             )}
           >
             <div className={cn("size-1.5 rounded-full", isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/40")} />
-            {isStreaming ? "PROCESSANDO" : "AGUARDANDO"}
+            <span className="hidden sm:inline">{isStreaming ? "PROCESSING" : "WAITING"}</span>
           </div>
         </div>
       </div>
+
+      {/* Painel de seleção de provider */}
+      {showProviderPanel && (
+        <ProviderPanel
+          providers={AI_PROVIDERS}
+          selected={selectedProvider}
+          todayUsage={todayUsage}
+          creditBalances={creditBalances}
+          onSelect={(id) => {
+            setSelectedProvider(id);
+            setShowProviderPanel(false);
+          }}
+          onClose={() => setShowProviderPanel(false)}
+        />
+      )}
 
       {/* Messages */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-5"
+        className="flex-1 overflow-y-auto px-4 py-6"
       >
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-6">
         {messages.length === 0 ? (
           <WelcomeState onPrompt={handleQuickPrompt} isStreaming={isStreaming} />
         ) : (
@@ -376,38 +567,40 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
             if (!text && toolParts.length === 0) return null;
 
-            return (
-              <div key={msg.id} className={cn("flex gap-3", isUser ? "ml-auto flex-row-reverse max-w-xl" : "max-w-3xl")}>
-                <div
-                  className={cn(
-                    "flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border",
-                    isUser
-                      ? "bg-muted/40 border-border/40"
-                      : "bg-primary/10 border-primary/20"
-                  )}
-                >
-                  {isUser ? (
-                    <User className="size-3.5 text-muted-foreground" />
-                  ) : (
-                    <Bot className="size-3.5 text-primary" />
-                  )}
+            // Mensagens do usuário: bolha alinhada à direita, estilo Claude.
+            // Mensagens da IA: texto corrido sem chrome pesado, alinhado à esquerda.
+            if (isUser) {
+              return (
+                <div key={msg.id} className="flex justify-end">
+                  <div className="flex flex-col gap-2 items-end max-w-[85%]">
+                    {sentFilesMap[msg.id]?.length > 0 && (
+                      <div className="flex gap-2 flex-wrap justify-end">
+                        {sentFilesMap[msg.id].map((f) => (
+                          <FileThumbnail key={f.id} file={f} />
+                        ))}
+                      </div>
+                    )}
+                    {text && (
+                      <div className="rounded-2xl px-4 py-2.5 text-xs font-mono leading-relaxed bg-primary/10 border border-primary/20 text-foreground">
+                        <MarkdownText text={text} />
+                      </div>
+                    )}
+                  </div>
                 </div>
+              );
+            }
 
-                <div className="flex flex-col gap-2 min-w-0">
-                  {/* Tool invocations */}
+            return (
+              <div key={msg.id} className="flex gap-3">
+                <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-primary/10 border-primary/20">
+                  <Bot className="size-3.5 text-primary" />
+                </div>
+                <div className="flex flex-col gap-2 min-w-0 flex-1 pt-1">
                   {toolParts.map((tp, i) => (
                     <ToolCard key={i} part={tp} />
                   ))}
-                  {/* Text bubble */}
                   {text && (
-                    <div
-                      className={cn(
-                        "rounded-xl px-4 py-3 text-xs font-mono leading-relaxed border",
-                        isUser
-                          ? "bg-muted/30 border-border/30 text-foreground"
-                          : "bg-card/60 border-border/40 text-foreground"
-                      )}
-                    >
+                    <div className="text-xs font-mono leading-relaxed text-foreground">
                       <MarkdownText text={text} />
                     </div>
                   )}
@@ -417,22 +610,49 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           })
         )}
 
-        {/* Streaming dots */}
-        {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
-          <div className="flex gap-3 max-w-3xl">
-            <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-primary/10 border-primary/20">
-              <Bot className="size-3.5 text-primary" />
+        {/* API error banner */}
+        {apiError && (
+          <div className="flex items-start gap-3">
+            <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-destructive/10 border-destructive/25">
+              <AlertTriangle className="size-3.5 text-destructive" />
             </div>
-            <div className="rounded-xl px-4 py-3 bg-card/60 border border-border/40">
-              <div className="flex gap-1 items-center">
-                <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-                <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
-                <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+            <div className="flex items-center justify-between gap-3 flex-1 rounded-xl px-4 py-3 bg-destructive/5 border border-destructive/20 text-xs font-mono text-destructive">
+              <span>{apiError}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    setApiError(null);
+                    regenerate();
+                  }}
+                  aria-label="Try again"
+                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md border border-destructive/30 hover:bg-destructive/10 transition-colors"
+                >
+                  <RefreshCw className="size-3" />
+                  Try again
+                </button>
+                <button onClick={() => setApiError(null)} aria-label="Dismiss error" className="hover:opacity-70 transition-opacity">
+                  <X className="size-3.5" />
+                </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Streaming dots */}
+        {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
+          <div className="flex gap-3">
+            <div className="flex items-center justify-center size-7 rounded-md shrink-0 mt-0.5 border bg-primary/10 border-primary/20">
+              <Bot className="size-3.5 text-primary" />
+            </div>
+            <div className="flex gap-1 items-center pt-3">
+              <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+              <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+              <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
+        </div>
       </div>
 
       {/* Scroll button */}
@@ -440,7 +660,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
         <button
           onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
           className="absolute bottom-28 right-6 flex items-center justify-center size-8 rounded-full bg-card border border-border/60 text-muted-foreground hover:text-foreground shadow-lg transition-all z-10"
-          aria-label="Rolar para o final"
+          aria-label="Scroll to bottom"
         >
           <ChevronDown className="size-4" />
         </button>
@@ -448,6 +668,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
 
       {/* Input area */}
       <div className="shrink-0 border-t border-border/40 bg-card/30 backdrop-blur-sm px-4 py-3">
+      <div className="max-w-3xl mx-auto w-full">
         {/* Quick prompts strip */}
         {messages.length > 0 && (
           <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-none">
@@ -479,31 +700,11 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           </div>
         )}
 
-        {/* Attached files preview */}
+        {/* Attached files preview — sempre com miniatura, estilo Claude Code */}
         {attachedFiles.length > 0 && (
           <div className="flex gap-2 mb-2 flex-wrap">
             {attachedFiles.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg border border-border/40 bg-muted/20 text-[10px] font-mono text-muted-foreground max-w-[160px] group"
-              >
-                {f.preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.preview} alt={f.name} className="size-5 rounded object-cover shrink-0" />
-                ) : f.type === "application/pdf" ? (
-                  <FileText className="size-4 text-destructive/70 shrink-0" />
-                ) : (
-                  <FileText className="size-4 text-muted-foreground/60 shrink-0" />
-                )}
-                <span className="truncate">{f.name}</span>
-                <button
-                  onClick={() => removeFile(f.id)}
-                  aria-label={`Remover ${f.name}`}
-                  className="ml-1 hover:text-foreground transition-colors shrink-0"
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
+              <FileThumbnail key={f.id} file={f} onRemove={() => removeFile(f.id)} />
             ))}
           </div>
         )}
@@ -517,12 +718,12 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             multiple
             className="sr-only"
             onChange={handleFileInput}
-            aria-label="Anexar arquivo"
+            aria-label="Attach file"
           />
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isStreaming || attachedFiles.length >= MAX_FILES}
-            aria-label="Anexar arquivo"
+            aria-label="Attach file"
             className={cn(
               "flex items-center justify-center size-10 shrink-0 rounded-lg border transition-colors",
               attachedFiles.length > 0
@@ -539,7 +740,7 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Pergunte, envie um contracheque, extrato ou fatura… (Enter para enviar)"
+            placeholder="Ask a question, send a paycheck, statement, or bill… (Enter to send)"
             rows={1}
             disabled={isStreaming}
             className="flex-1 resize-none min-h-[40px] max-h-[120px] rounded-lg border border-border/50 bg-background/60 px-3 py-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 disabled:opacity-50 transition-all leading-relaxed"
@@ -551,32 +752,265 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
             }}
           />
 
-          <Button
-            size="sm"
-            onClick={handleSend}
-            disabled={(!inputValue.trim() && attachedFiles.length === 0) || isStreaming}
-            className="size-10 shrink-0 p-0"
-            aria-label="Enviar mensagem"
-          >
-            {isStreaming ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          </Button>
+          {isStreaming ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => stop()}
+              className="size-10 shrink-0 p-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+              aria-label="Stop response"
+            >
+              <XCircle className="size-4" />
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={handleSend}
+              disabled={!inputValue.trim() && attachedFiles.length === 0}
+              className="size-10 shrink-0 p-0"
+              aria-label="Send message"
+            >
+              <Send className="size-4" />
+            </Button>
+          )}
         </div>
 
-        <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
-          Gemini 2.0 Flash · Dados inseridos diretamente no seu ledger · Arraste arquivos para a tela
-        </p>
+        {(() => {
+          const prov = AI_PROVIDERS.find((p) => p.id === selectedProvider)!;
+          const usage = todayUsage.requests[selectedProvider] ?? 0;
+          const limit = prov.freeDailyRequests;
+          const balance = creditBalances[selectedProvider];
+          return (
+            <p className="text-[10px] font-mono text-muted-foreground/40 text-center mt-2">
+              {prov.label} · {prov.modelLabel}
+              {limit != null && (
+                <> · <span className={cn(usage / limit > 0.8 ? "text-destructive/50" : "")}>
+                  {usage}/{limit} req today
+                </span></>
+              )}
+              {prov.billedByCredit && (
+                <> · <span className={cn(balance != null && balance < 1 ? "text-destructive/50" : "")}>
+                  ${balance != null ? balance.toFixed(2) : "?"} credit remaining
+                </span></>
+              )}
+              {" · "}Drag files anywhere on screen
+            </p>
+          );
+        })()}
+      </div>
       </div>
     </div>
   );
 }
 
+// ── Provider Panel ────────────────────────────────────────────────────────────
+interface ProviderPanelProps {
+  providers: AIProviderDef[];
+  selected: ProviderId;
+  todayUsage: ReturnType<typeof getTodayUsage>;
+  creditBalances: Partial<Record<ProviderId, number>>;
+  onSelect: (id: ProviderId) => void;
+  onClose: () => void;
+}
+
+function ProviderPanel({ providers, selected, todayUsage, creditBalances, onSelect, onClose }: ProviderPanelProps) {
+  return (
+    <div className="shrink-0 border-b border-border/40 bg-card/50 backdrop-blur-sm px-4 py-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Cpu className="size-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-mono font-semibold text-foreground tracking-wide">
+            AI MODEL
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground/60 hover:text-foreground transition-colors"
+          aria-label="Close panel"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {providers.map((prov) => {
+          const isSelected = prov.id === selected;
+          const usage = todayUsage.requests[prov.id] ?? 0;
+          const limit = prov.freeDailyRequests;
+          const usagePct = limit ? Math.min(usage / limit, 1) : 0;
+          const isNearLimit = limit != null && usagePct > 0.8;
+          const isAtLimit = limit != null && usage >= limit;
+          const balance = creditBalances[prov.id];
+          const isOutOfCredit = prov.billedByCredit && balance != null && balance <= 0;
+          const isDisabled = isAtLimit || isOutOfCredit;
+
+          return (
+            <button
+              key={prov.id}
+              onClick={() => !isDisabled && onSelect(prov.id)}
+              disabled={isDisabled}
+              className={cn(
+                "flex flex-col gap-2 p-3 rounded-lg border text-left transition-all",
+                isSelected
+                  ? "border-primary/50 bg-primary/8"
+                  : isDisabled
+                  ? "border-border/30 bg-muted/10 opacity-50 cursor-not-allowed"
+                  : "border-border/40 bg-card/40 hover:border-border/80 hover:bg-card/70"
+              )}
+              aria-pressed={isSelected}
+            >
+              {/* Linha 1: nome + badge selecionado */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Dot colorido do provider */}
+                  <span
+                    className="size-2 rounded-full shrink-0"
+                    style={{ backgroundColor: prov.color }}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-mono font-semibold text-foreground truncate">
+                      {prov.modelLabel}
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground/70 truncate">
+                      {prov.label}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {prov.supportsFiles && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground/60">
+                      files
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary">
+                      active
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Linha 2: barra de uso (só para providers com free tier) */}
+              {limit != null ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[9px] font-mono">
+                    <span className="text-muted-foreground/60">Usage today</span>
+                    <span className={cn(isNearLimit ? "text-destructive/70" : "text-muted-foreground/60")}>
+                      {usage} / {limit} req
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full bg-muted/30 overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        isAtLimit
+                          ? "bg-destructive/60"
+                          : isNearLimit
+                          ? "bg-amber-500/60"
+                          : "bg-primary/50"
+                      )}
+                      style={{ width: `${usagePct * 100}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
+                    {isAtLimit ? "Limit reached — use another model" : prov.freeInfo}
+                  </div>
+                </div>
+              ) : prov.billedByCredit ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[9px] font-mono">
+                    <span className="text-muted-foreground/60">Credit balance</span>
+                    <span className={cn(isOutOfCredit ? "text-destructive/70" : "text-muted-foreground/60")}>
+                      ${balance != null ? balance.toFixed(2) : "?"}
+                    </span>
+                  </div>
+                  <div className="text-[9px] font-mono text-muted-foreground/50 truncate">
+                    {isOutOfCredit ? "No balance — add credits or use another model" : prov.freeInfo}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground/50">
+                  <Info className="size-2.5 shrink-0" />
+                  {prov.freeInfo}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Nota sobre chaves de API */}
+      <p className="text-[9px] font-mono text-muted-foreground/40 mt-3 text-center">
+        Each model requires its own API key configured in Vars · Usage shown is estimated locally
+      </p>
+    </div>
+  );
+}
+
+// ── File thumbnail — miniatura de arquivo anexado, estilo Claude Code ─────────
+export function FileThumbnail({
+  file,
+  onRemove,
+}: {
+  file: AttachedFile;
+  onRemove?: () => void;
+}) {
+  const ext = file.name.split(".").pop()?.toUpperCase() ?? "FILE";
+  const sizeLabel = file.size < 1024 * 1024
+    ? `${Math.round(file.size / 1024)} KB`
+    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+  return (
+    <div className="relative flex items-center gap-2 pr-2.5 py-1.5 pl-1.5 rounded-lg border border-border/50 bg-card/60 max-w-[200px] group shrink-0">
+      {file.preview ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={file.preview}
+          alt={file.name}
+          className="size-9 rounded-md object-cover shrink-0 border border-border/40"
+        />
+      ) : (
+        <div
+          className={cn(
+            "flex items-center justify-center size-9 rounded-md shrink-0 border",
+            file.type === "application/pdf"
+              ? "bg-destructive/10 border-destructive/25 text-destructive"
+              : "bg-primary/10 border-primary/20 text-primary"
+          )}
+        >
+          <FileText className="size-4" />
+        </div>
+      )}
+      <div className="flex flex-col min-w-0 leading-tight">
+        <span className="text-[10px] font-mono text-foreground truncate max-w-[110px]">{file.name}</span>
+        <span className="text-[9px] font-mono text-muted-foreground/70 tracking-wide">
+          {ext} · {sizeLabel}
+        </span>
+      </div>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          aria-label={`Remove ${file.name}`}
+          className="absolute -top-1.5 -right-1.5 flex items-center justify-center size-4 rounded-full bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+        >
+          <X className="size-2.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Tool card — exibe status de execução de tools ─────────────────────────────
-function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
+export function ToolCard({ part }: { part: { type: string; toolName?: string; state?: string; result?: unknown } }) {
   const toolLabels: Record<string, { label: string; icon: React.ElementType }> = {
-    addTransaction: { label: "Registrando lançamento", icon: PlusCircle },
-    upsertDebt: { label: "Registrando dívida", icon: PlusCircle },
-    upsertInvestment: { label: "Registrando investimento", icon: PlusCircle },
-    readFinancialData: { label: "Lendo dados financeiros", icon: Database },
+    addTransaction:       { label: "Logging entry",                icon: PlusCircle },
+    upsertDebt:           { label: "Logging debt",                 icon: PlusCircle },
+    upsertInvestment:     { label: "Logging investment",           icon: PlusCircle },
+    readFinancialData:    { label: "Reading financial data",       icon: Database },
+    searchTransactions:   { label: "Searching entries",            icon: Database },
+    updateTransaction:    { label: "Updating entry",                icon: RefreshCw },
+    deleteTransaction:    { label: "Removing entry",                icon: XCircle },
+    updateDebt:           { label: "Updating debt",                 icon: RefreshCw },
   };
 
   const info = toolLabels[part.toolName ?? ""] ?? { label: part.toolName ?? "Tool", icon: Database };
@@ -631,14 +1065,14 @@ function WelcomeState({
         </div>
         <h2 className="text-base font-bold font-mono text-foreground">OHIRO-IA</h2>
         <p className="text-xs font-mono text-muted-foreground max-w-sm leading-relaxed">
-          Assistente financeiro com acesso direto ao seu ledger. Envie arquivos, fotos de
-          contracheques, extratos ou faturas — a IA extrai e registra tudo automaticamente.
+          Financial assistant with direct access to your ledger. Send files, photos of
+          paychecks, bank statements, or bills — the AI extracts and logs everything automatically.
         </p>
         <div className="flex items-center justify-center gap-4 mt-3">
           {[
-            { icon: ImageIcon, label: "Contracheques" },
-            { icon: FileText, label: "Extratos" },
-            { icon: FileText, label: "Faturas" },
+            { icon: ImageIcon, label: "Paychecks" },
+            { icon: FileText, label: "Statements" },
+            { icon: FileText, label: "Bills" },
           ].map(({ icon: Icon, label }) => (
             <div key={label} className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/60">
               <Icon className="size-3" />
@@ -678,7 +1112,7 @@ function WelcomeState({
 }
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
-function MarkdownText({ text }: { text: string }) {
+export function MarkdownText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
     <div className="space-y-1">

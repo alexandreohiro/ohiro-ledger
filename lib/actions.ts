@@ -3,21 +3,38 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { Transaction, Investment, Debt, Account } from '@/lib/types'
+import { checkRateLimit } from '@/lib/security'
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Retorna o usuário autenticado ou lança erro. */
+async function requireUser() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) throw new Error('Não autenticado')
+  return { supabase, user }
+}
+
+/** Aplica rate limit nas mutations para evitar abuso. */
+async function requireRateLimit(userId: string) {
+  const { allowed } = checkRateLimit(`action:${userId}`)
+  if (!allowed) throw new Error('Muitas requisições. Aguarde um momento e tente novamente.')
+}
 
 // ─── TRANSACTIONS ──────────────────────────────────────────────────────────────
 
 export async function getTransactions(): Promise<Transaction[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
 
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', user.id)            // defesa em profundidade — não confiar só em RLS
     .order('date', { ascending: false })
+    .limit(2000)                       // evita buscar histórico ilimitado
 
   if (error) throw new Error(error.message)
 
@@ -38,14 +55,9 @@ export async function getTransactions(): Promise<Transaction[]> {
   }))
 }
 
-export async function addTransaction(
-  tx: Omit<Transaction, 'id'>,
-): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+export async function addTransaction(tx: Omit<Transaction, 'id'>): Promise<void> {
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase.from('transactions').insert({
     user_id: user.id,
@@ -68,11 +80,8 @@ export async function addTransaction(
 }
 
 export async function updateTransaction(tx: Transaction): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('transactions')
@@ -98,11 +107,8 @@ export async function updateTransaction(tx: Transaction): Promise<void> {
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('transactions')
@@ -117,17 +123,14 @@ export async function deleteTransaction(id: string): Promise<void> {
 // ─── INVESTMENTS ───────────────────────────────────────────────────────────────
 
 export async function getInvestments(): Promise<Investment[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
 
   const { data, error } = await supabase
     .from('investments')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (error) throw new Error(error.message)
 
@@ -143,14 +146,9 @@ export async function getInvestments(): Promise<Investment[]> {
   }))
 }
 
-export async function addInvestment(
-  inv: Omit<Investment, 'id'>,
-): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+export async function addInvestment(inv: Omit<Investment, 'id'>): Promise<void> {
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase.from('investments').insert({
     user_id: user.id,
@@ -168,11 +166,8 @@ export async function addInvestment(
 }
 
 export async function updateInvestment(inv: Investment): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('investments')
@@ -193,11 +188,8 @@ export async function updateInvestment(inv: Investment): Promise<void> {
 }
 
 export async function deleteInvestment(id: string): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('investments')
@@ -212,17 +204,14 @@ export async function deleteInvestment(id: string): Promise<void> {
 // ─── DEBTS ─────────────────────────────────────────────────────────────────────
 
 export async function getDebts(): Promise<Debt[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
 
   const { data, error } = await supabase
     .from('debts')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (error) throw new Error(error.message)
 
@@ -240,11 +229,8 @@ export async function getDebts(): Promise<Debt[]> {
 }
 
 export async function addDebt(debt: Omit<Debt, 'id'>): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase.from('debts').insert({
     user_id: user.id,
@@ -263,11 +249,8 @@ export async function addDebt(debt: Omit<Debt, 'id'>): Promise<void> {
 }
 
 export async function updateDebt(debt: Debt): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('debts')
@@ -289,11 +272,8 @@ export async function updateDebt(debt: Debt): Promise<void> {
 }
 
 export async function deleteDebt(id: string): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('debts')
@@ -305,20 +285,17 @@ export async function deleteDebt(id: string): Promise<void> {
   revalidatePath('/app')
 }
 
-// ─── ACCOUNTS ──────────────────────────────────────────────────────────────────
+// ─── BANK ACCOUNTS ─────────────────────────────────────────────────────────────
 
-export async function getAccounts(): Promise<Account[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+export async function getBankAccounts(): Promise<Account[]> {
+  const { supabase, user } = await requireUser()
 
   const { data, error } = await supabase
     .from('accounts')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (error) throw new Error(error.message)
 
@@ -332,12 +309,9 @@ export async function getAccounts(): Promise<Account[]> {
   }))
 }
 
-export async function addAccount(account: Omit<Account, 'id'>): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+export async function addBankAccount(account: Omit<Account, 'id'>): Promise<void> {
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase.from('accounts').insert({
     user_id: user.id,
@@ -352,12 +326,9 @@ export async function addAccount(account: Omit<Account, 'id'>): Promise<void> {
   revalidatePath('/app')
 }
 
-export async function updateAccount(account: Account): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+export async function updateBankAccount(account: Account): Promise<void> {
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('accounts')
@@ -375,12 +346,9 @@ export async function updateAccount(account: Account): Promise<void> {
   revalidatePath('/app')
 }
 
-export async function deleteAccount(id: string): Promise<void> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+export async function deleteBankAccount(id: string): Promise<void> {
+  const { supabase, user } = await requireUser()
+  await requireRateLimit(user.id)
 
   const { error } = await supabase
     .from('accounts')
@@ -398,4 +366,68 @@ export async function signOut(): Promise<void> {
   const supabase = await createClient()
   await supabase.auth.signOut()
   revalidatePath('/')
+}
+
+// ─── LGPD — Exportação de dados do titular (Art. 18 LGPD) ─────────────────────
+
+export async function exportUserData(): Promise<object> {
+  const { supabase, user } = await requireUser()
+
+  const { data, error } = await supabase.rpc('export_user_data', {
+    p_user_id: user.id,
+  })
+
+  if (error) throw new Error(`Falha na exportação: ${error.message}`)
+  return data as object
+}
+
+// ─── LGPD — Exclusão de conta (Art. 18 VI LGPD — direito ao esquecimento) ──────
+
+export async function deleteAccount(): Promise<void> {
+  const { supabase, user } = await requireUser()
+
+  // Usa service_role implícito via SECURITY DEFINER na função SQL
+  const { error } = await supabase.rpc('delete_user_account', {
+    p_user_id: user.id,
+  })
+
+  if (error) throw new Error(`Falha na exclusão: ${error.message}`)
+
+  // Invalida a sessão localmente
+  await supabase.auth.signOut()
+  revalidatePath('/')
+}
+
+// ─── LGPD — Consentimento para uso de IA ──────────────────────────────────────
+
+export async function saveAiConsent(consented: boolean): Promise<void> {
+  const { supabase, user } = await requireUser()
+
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert(
+      {
+        user_id: user.id,
+        ai_consent: consented,
+        ai_consent_at: consented ? new Date().toISOString() : null,
+      },
+      { onConflict: 'user_id' },
+    )
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/app')
+}
+
+export async function getAiConsent(): Promise<boolean> {
+  const { supabase, user } = await requireUser()
+
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('ai_consent')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  // Falha aberta: schema desatualizado (coluna ausente) não deve derrubar a página /app.
+  if (error) return false
+  return data?.ai_consent ?? false
 }
