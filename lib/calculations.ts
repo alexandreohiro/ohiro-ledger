@@ -67,6 +67,45 @@ export function calcTotalPatrimony(investments: Investment[]): number {
   return investments.reduce((sum, inv) => sum + inv.convertedAmountBRL, 0);
 }
 
+// ── Ohiro Score — pontuação composta de saúde financeira (0-100) ────────────────
+// Pesos: comprometimento de renda (50%), taxa de investimento (30%), saldo livre (20%)
+export interface OhiroScore {
+  value: number;
+  label: "Crítico" | "Atenção" | "Saudável" | "Excelente";
+  insight: string;
+}
+
+export function calcOhiroScore(summary: Pick<FinancialSummary, "incomeCommitment" | "investmentRate" | "freeBalance" | "totalRevenue">): OhiroScore {
+  const commitmentScore = Math.max(0, 100 - summary.incomeCommitment);
+  const investmentScore = Math.min(100, summary.investmentRate * 5);
+  const balanceRatio = summary.totalRevenue > 0 ? (summary.freeBalance / summary.totalRevenue) * 100 : 0;
+  const balanceScore = Math.max(0, Math.min(100, balanceRatio * 4));
+
+  const value = Math.round(commitmentScore * 0.5 + investmentScore * 0.3 + balanceScore * 0.2);
+
+  let label: OhiroScore["label"];
+  let insight: string;
+  if (value < 40) {
+    label = "Crítico";
+    insight = summary.incomeCommitment > 70
+      ? "Your committed income is too high — cut a fixed expense before it cuts your options."
+      : "Your free balance is too thin — review essential spending this month.";
+  } else if (value < 65) {
+    label = "Atenção";
+    insight = summary.investmentRate < 10
+      ? "You're not investing enough of your income — even a small recurring contribution moves this score."
+      : "You're close to balanced — keep commitments below 70% of income.";
+  } else if (value < 85) {
+    label = "Saudável";
+    insight = "Solid month — your spending and saving are in a healthy range.";
+  } else {
+    label = "Excelente";
+    insight = "Excellent control — your income, spending and investing are well balanced.";
+  }
+
+  return { value: Math.max(0, Math.min(100, value)), label, insight };
+}
+
 export function calcFinancialSummary(
   transactions: Transaction[],
   investments: Investment[]

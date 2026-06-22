@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Transaction, Investment } from "@/lib/types";
 import {
   calcFinancialSummary,
+  calcOhiroScore,
   formatCurrency,
   formatPercent,
   groupByCategory,
@@ -12,6 +13,7 @@ import {
   formatMonthLabel,
 } from "@/lib/calculations";
 import { SummaryCard } from "../summary-card";
+import { OhiroScoreCard } from "../ohiro-score-card";
 import { RiskBadge, StatusBadge } from "../risk-badge";
 import { translateCategory } from "@/lib/i18n-labels";
 import {
@@ -164,6 +166,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
 
 export function DashboardView({ transactions, monthTransactions, investments, selectedMonthKey }: DashboardViewProps) {
   const summary = calcFinancialSummary(monthTransactions, investments);
+  const ohiroScore = useMemo(() => calcOhiroScore(summary), [summary]);
 
   // Gastos + dívidas do mês selecionado
   const monthExpenses = useMemo(
@@ -211,6 +214,9 @@ export function DashboardView({ transactions, monthTransactions, investments, se
           </div>
         )}
       </div>
+
+      {/* Hero — Ohiro Score */}
+      <OhiroScoreCard score={ohiroScore} />
 
       {/* Row 1 — KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

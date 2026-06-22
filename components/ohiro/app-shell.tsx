@@ -11,6 +11,7 @@ import {
 } from "@/lib/calculations";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
+import { BottomNav } from "./bottom-nav";
 import { AddTransactionModal } from "./add-transaction-modal";
 import { DashboardView } from "./views/dashboard-view";
 import { LedgerView } from "./views/ledger-view";
@@ -313,7 +314,7 @@ export function AppShell({
           availableMonthsCount={availableMonths.length}
         />
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pb-16 md:pb-0">
           {activeView === "dashboard" && (
             <DashboardView
               transactions={transactions}
@@ -402,6 +403,8 @@ export function AppShell({
             />
           )}
         </main>
+
+        <BottomNav activeView={activeView} onNavigate={setActiveView} />
       </div>
 
       <AddTransactionModal
