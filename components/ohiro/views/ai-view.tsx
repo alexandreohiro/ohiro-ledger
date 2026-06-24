@@ -32,7 +32,6 @@ import {
   RefreshCw,
   Database,
   PlusCircle,
-  ShieldCheck,
   ChevronRight,
   Cpu,
   Activity,
@@ -564,9 +563,9 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
           <Bot className="size-4 text-primary" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-sm font-bold font-mono text-foreground tracking-wide">OHIRO-IA</h1>
-          <p className="text-[10px] font-mono text-muted-foreground tracking-widest truncate">
-            FINANCIAL ASSISTANT · MULTIMODAL
+          <h1 className="text-sm font-bold font-mono text-foreground tracking-wide">Ohiro Assistant</h1>
+          <p className="text-[10px] font-mono text-muted-foreground truncate">
+            {isStreaming ? "Thinking..." : "Ask anything about your money"}
           </p>
         </div>
 
@@ -618,50 +617,21 @@ export function AIView({ transactions, investments, debts }: AIViewProps) {
               >
                 <Cpu className="size-3 shrink-0" />
                 <span className="hidden sm:inline">{prov.modelLabel}</span>
-                {remaining != null && (
-                  <span
-                    className={cn(
-                      "hidden sm:inline px-1.5 py-0.5 rounded border text-[9px]",
-                      isNearLimit
-                        ? "border-destructive/40 text-destructive bg-destructive/10"
-                        : "border-border/40 text-muted-foreground/70 bg-muted/20"
-                    )}
-                  >
-                    {remaining} left
-                  </span>
-                )}
-                {prov.billedByCredit && balance != null && (
-                  <span
-                    className={cn(
-                      "hidden sm:inline px-1.5 py-0.5 rounded border text-[9px]",
-                      isLowBalance
-                        ? "border-destructive/40 text-destructive bg-destructive/10"
-                        : "border-border/40 text-muted-foreground/70 bg-muted/20"
-                    )}
-                  >
-                    ${balance.toFixed(2)} balance
-                  </span>
+                {(isNearLimit || isLowBalance) && (
+                  <span className="size-1.5 rounded-full bg-destructive" aria-label="Near limit" />
                 )}
                 <ChevronRight className={cn("size-3 transition-transform", showProviderPanel && "rotate-90")} />
               </button>
             );
           })()}
 
-          <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border border-border/40">
-            <ShieldCheck className="size-3 text-muted-foreground/60" />
-            <span className="text-muted-foreground/60 hidden sm:inline">Encrypted</span>
-          </div>
           <div
             className={cn(
-              "flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded border",
-              isStreaming
-                ? "text-primary border-primary/30 bg-primary/10"
-                : "text-muted-foreground border-border/40"
+              "size-2 rounded-full shrink-0",
+              isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/30"
             )}
-          >
-            <div className={cn("size-1.5 rounded-full", isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/40")} />
-            <span className="hidden sm:inline">{isStreaming ? "PROCESSING" : "WAITING"}</span>
-          </div>
+            aria-hidden
+          />
         </div>
       </div>
 
