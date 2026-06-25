@@ -13,6 +13,7 @@ import { ExpensesRevenuesView } from "./views/expenses-revenues-view";
 import { DebtsView } from "./views/debts-view";
 import { InvestmentsView } from "./views/investments-view";
 import { ProjectionsView } from "./views/projections-view";
+import { TempoServicoView } from "./views/tempo-servico-view";
 import { SettingsView } from "./views/settings-view";
 import { AIView } from "./views/ai-view";
 import {
@@ -255,6 +256,7 @@ export function AppShell({
           {activeView === "projecoes" && (
             <ProjectionsView transactions={transactions} investments={investments} />
           )}
+          {activeView === "tempo-servico" && <TempoServicoView />}
           {activeView === "ia" && (
             <AIView
               transactions={transactions}
