@@ -81,4 +81,4 @@ export interface FinancialSummary {
   totalPatrimony: number;
 }
 
-export type ActiveView = "dashboard" | "ledger" | "gastos" | "receitas" | "dividas" | "investimentos" | "projecoes" | "tempo-servico" | "ia" | "configuracoes";
+export type ActiveView = "dashboard" | "ledger" | "gastos" | "receitas" | "dividas" | "investimentos" | "projecoes" | "ia" | "configuracoes";

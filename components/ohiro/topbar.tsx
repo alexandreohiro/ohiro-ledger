@@ -43,7 +43,6 @@ const viewLabels: Record<string, string> = {
   dividas: "GESTÃO DE DÍVIDAS",
   investimentos: "CARTEIRA DE INVESTIMENTOS",
   projecoes: "SIMULADOR DE CENÁRIOS",
-  "tempo-servico": "TEMPO DE SERVIÇO",
   ia: "IA FINANCEIRA",
   configuracoes: "CONFIGURAÇÕES",
 };
